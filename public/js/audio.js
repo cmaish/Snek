@@ -111,6 +111,10 @@ export const sfx = {
   win() {
     [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone({ f, dur: 0.16, type: 'triangle', vol: 0.18, when: i * 0.1 }));
   },
+  boing() {
+    tone({ f: 180, f2: 520, dur: 0.18, type: 'sine', vol: 0.22 });
+    tone({ f: 520, f2: 300, dur: 0.14, type: 'triangle', vol: 0.12, when: 0.12 });
+  },
   beep() {
     tone({ f: 660, dur: 0.14, type: 'square', vol: 0.09 });
   },

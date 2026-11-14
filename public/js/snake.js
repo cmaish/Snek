@@ -34,6 +34,7 @@ export class Snake {
     this.tongue = 0;
     this.tongueIn = rand(2, 6);
     this.hurt = 0;
+    this.bounceT = 0;
     this.dropAcc = 0;
     this.trailAcc = 0;
     this.speedMul = o.speedMul || 1;
@@ -158,6 +159,7 @@ export class Snake {
     this.mouth = Math.max(0, this.mouth - dt * 4);
     this.biteCd -= dt;
     this.hurt -= dt;
+    if (this.bounceT > 0) this.bounceT -= dt;
     this.blinkIn -= dt;
     if (this.blinkIn < 0) { this.blink = 1; this.blinkIn = rand(2, 5); }
     this.blink = Math.max(0, this.blink - dt * 7);

@@ -364,6 +364,7 @@ const FIELDS = [
   { key: 'matchSeconds', label: 'Match length', type: 'select', num: true, options: { 60: '1 minute', 120: '2 minutes', 180: '3 minutes', 300: '5 minutes', 600: '10 minutes', 0: 'Endless (until eaten)' } },
   { key: 'arenaSize', label: 'Arena size', type: 'select', options: { small: 'Small', medium: 'Medium', large: 'Large' } },
   { key: 'pelletDensity', label: 'Amount of food', type: 'select', options: { low: 'Less', normal: 'Normal', high: 'Lots' } },
+  { key: 'bounce', label: 'Bounce off bigger snakes when you crash into them (instead of being eaten)', type: 'check' },
   { key: 'gentle', label: 'Gentle mode — player loses length instead of being eaten (except when tiny)', type: 'check' },
   { h: 'Player' },
   { key: 'startLength', label: 'Starting size', type: 'range', min: 5, max: 60, step: 1 },

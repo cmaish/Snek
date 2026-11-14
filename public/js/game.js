@@ -556,16 +556,36 @@ export class Game {
         if (A.isPlayer || B.isPlayer) { sfx.ouch(); this.haptic(20); this.shake = Math.max(this.shake, 6); }
         return;
       }
-      this.defeat(winner === A ? B : A, winner);
+      const loser = winner === A ? B : A;
+      if (loser.isPlayer && this.settings.bounce) { this.bouncePlayer(loser, winner.head); winner.biteCd = 0.4; return; }
+      this.defeat(loser, winner);
       return;
     }
     if (aS && bS) { this.bounce(A, pt); A.biteCd = 0.3; return; }
-    if (bS) { this.defeat(A, B); return; }
-    if (aS || am > bm) {
+    if (aS || (!bS && am > bm)) {
       if (A.biteCd <= 0) this.bite(A, B, j);
       return;
     }
+    // A crashed into a bigger (or super-star) snake's body
+    if (A.isPlayer && this.settings.bounce) { this.bouncePlayer(A, pt); return; }
     this.defeat(A, B);
+  }
+
+  /** The player crashed into something bigger: bounce off instead of being eaten. */
+  bouncePlayer(P, pt) {
+    if (P.bounceT > 0) return;
+    this.bounce(P, pt);
+    P.head.x += Math.cos(P.angle) * 12;
+    P.head.y += Math.sin(P.angle) * 12;
+    P.bounceT = 0.35;
+    sfx.boing();
+    this.haptic(20);
+    this.shake = Math.max(this.shake, 5);
+    this.ring(pt.x, pt.y, '#ffffff', P.radius() * 3);
+    if (this.t - (this.lastBoing || -9) > 1.2) {
+      this.lastBoing = this.t;
+      this.floatText(P.head.x, P.head.y - 30, 'BOING!', '#9be7ff', 24);
+    }
   }
 
   bounce(A, pt) {
