@@ -1,0 +1,40 @@
+<!doctype html>
+<html><body style="margin:0;background:transparent">
+<canvas id="c"></canvas>
+<script type="module">
+// Draws the app icon using the game's own renderer. Used by make-icons.mjs.
+import { drawFace, ballSprite } from '../public/js/render.js';
+const params = new URLSearchParams(location.search);
+const size = +params.get('size') || 512;
+const maskable = params.get('maskable') === '1';
+const c = document.getElementById('c');
+c.width = c.height = size;
+const g = c.getContext('2d');
+const gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size * 0.75);
+gr.addColorStop(0, '#5a4bd6');
+gr.addColorStop(1, '#2a1d6e');
+g.fillStyle = gr;
+if (maskable) g.fillRect(0, 0, size, size);
+else { g.beginPath(); g.roundRect(0, 0, size, size, size * 0.22); g.fill(); }
+const k = maskable ? 0.78 : 1;
+g.translate(size / 2, size / 2); g.scale(k, k); g.translate(-size / 2, -size / 2);
+// body curling around
+const colors = ['#5be37d', '#2fbf5b'];
+const pts = [];
+for (let i = 0; i < 26; i++) {
+  const a = -0.6 + i * 0.22;
+  const rr = size * (0.27 - i * 0.003);
+  pts.push([size / 2 + Math.cos(a) * rr, size * 0.53 + Math.sin(a) * rr]);
+}
+const r = size * 0.075;
+for (let i = pts.length - 1; i >= 1; i--) {
+  const s = ballSprite(colors[Math.floor(i / 2) % 2]);
+  g.drawImage(s, pts[i][0] - r, pts[i][1] - r, r * 2, r * 2);
+}
+const hr = size * 0.16;
+const hx = size * 0.5, hy = size * 0.47;
+g.drawImage(ballSprite('#5be37d'), hx - hr, hy - hr, hr * 2, hr * 2);
+drawFace(g, hx, hy, hr, -Math.PI / 2 + 0.0001 + Math.PI, { eyes: 'cute', hat: 'crown', colors }, { t: 0, look: Math.PI / 2 });
+document.title = 'done';
+</script>
+</body></html>
