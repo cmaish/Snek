@@ -40,6 +40,13 @@ function haptic(p) {
 
 function tap() { sfx.click(); haptic(8); }
 
+/** Body classes for layout preferences (boost side, extended UI). */
+function applyPrefs() {
+  document.body.classList.toggle('boost-left', progress.boostLeft);
+  document.body.classList.toggle('ext-ui', progress.extendedUi);
+  if (game) game.showRadar = progress.extendedUi;
+}
+
 // ------------------------------------------------------------- home ----
 function today() {
   const d = new Date();
@@ -55,7 +62,7 @@ function refreshHome() {
   $('#name-input').value = progress.name;
   $('#btn-install').classList.toggle('hidden', !installEvt);
   $('#btn-gift').classList.toggle('hidden', !giftReady());
-  document.body.classList.toggle('boost-left', progress.boostLeft);
+  applyPrefs();
 }
 
 function previewLoop(ts) {
@@ -347,7 +354,7 @@ async function startGame(boosters) {
   $('#btn-boost').classList.toggle('hidden', !settings.boostEnabled);
   $('#hud-timer').classList.toggle('hidden', settings.matchSeconds <= 0);
   $('#toasts').innerHTML = '';
-  document.body.classList.toggle('boost-left', progress.boostLeft);
+  applyPrefs();
   show('play');
   goFullscreen();
   if (progress.tipsShown < 3) {
@@ -589,7 +596,7 @@ async function boot() {
       saveProgress();
       setSound(progress.sound);
       setMusic(progress.music);
-      document.body.classList.toggle('boost-left', progress.boostLeft);
+      applyPrefs();
       renderToggles();
       tap();
     });

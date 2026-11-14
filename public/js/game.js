@@ -5,10 +5,10 @@ import { updateBot, newBrain, DIFFICULTY } from './bots.js';
 import { pelletSprite, starSprite, powerupSprite, POWERUPS, RAINBOW_COLORS, skinColor, ballSprite, glowSprite } from './render.js';
 import { sfx } from './audio.js';
 
-const ARENA = { small: 1300, medium: 1800, large: 2500 };
+const ARENA = { small: 1800, medium: 2600, large: 3600 };
 const DENSITY = { low: 0.55, normal: 1, high: 1.7 };
 const PELLET_COLORS = ['#ff4f6d', '#ffd23f', '#3ddc97', '#4cc9f0', '#b388ff', '#ff9f1c', '#f72585', '#7cff6b', '#ffffff', '#00f5d4'];
-const MAX_PELLETS = 2400;
+const MAX_PELLETS = 4000;
 const MILESTONES = [25, 50, 100, 150, 200, 300, 400, 500, 750, 1000, 1500];
 const STREAK_WORDS = ['', '', 'DOUBLE GULP!', 'TRIPLE GULP!', 'MEGA GULP!', 'UNSTOPPABLE!', 'SNAKE KING!'];
 const BOT_NAMES = [
@@ -266,8 +266,8 @@ export class Game {
     const base = S.startLength;
     let len;
     if (P && !initial) {
-      const small = S.difficulty === 'easy' ? 0.85 : S.difficulty === 'hard' ? 0.6 : 0.75;
-      len = Math.random() < small ? rand(base, Math.max(base + 6, P.mass * 0.7)) : rand(P.mass * 0.85, P.mass * 1.2 + 6);
+      if (S.difficulty === 'hard' && Math.random() < 0.3) len = rand(P.mass * 0.85, P.mass * 1.2 + 6);
+      else len = rand(Math.max(base, P.mass * 0.35), Math.max(base + 6, P.mass * 0.8));
     } else {
       len = base + Math.pow(Math.random(), 2.5) * (S.difficulty === 'hard' ? 70 : S.difficulty === 'easy' ? 15 : 30);
     }
@@ -1203,7 +1203,7 @@ export class Game {
   }
 
   drawMinimap() {
-    if (this.mode !== 'play') return;
+    if (this.mode !== 'play' || !this.showRadar) return;
     const g = this.mmCtx, S = this.minimap.width, m = S / 2, k = (m - 4) / this.R;
     g.clearRect(0, 0, S, S);
     g.fillStyle = 'rgba(30,20,90,0.6)';

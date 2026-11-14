@@ -20,7 +20,7 @@ It's a Progressive Web App made of plain static files (HTML/CSS/JS, no build ste
 **Pre-game boosters** (bought with coins on the screen after PLAY):
 🍔 Big Start · 🫧 Bubble Shield · 🧲 Super Magnet · 🚀 Turbo Fuel (free boosting) · ❤️ Extra Life · 💰 Coin Rush (double coins)
 
-**Kid settings** (⚙️ on the home screen): sound, music, vibration, and boost button on the left for left-handers. There's also a 🎁 daily gift with a streak bonus.
+**Kid settings** (⚙️ on the home screen): sound, music, vibration, boost button on the left for left-handers, and "Extended UI" to show the scoreboard and radar (off by default for a cleaner screen). There's also a 🎁 daily gift with a streak bonus.
 
 ## Grown-up settings (admin menu)
 

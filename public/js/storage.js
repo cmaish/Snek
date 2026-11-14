@@ -15,6 +15,7 @@ const DEFAULTS = {
   tipsShown: 0,
   haptics: true,
   boostLeft: false,
+  extendedUi: false,
   lastGift: '',
   giftStreak: 0,
   bestStreak: 0,

@@ -611,3 +611,9 @@ body.boost-left #minimap { left: auto; right: calc(10px + var(--safe-r)); }
 .head-rows .mini input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--purple); }
 .ask-wrap { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px; background: rgba(20, 10, 60, 0.55); }
 .ask-card { width: min(360px, 100%); font-weight: 700; }
+
+/* Scoreboard + radar only with "Extended UI" on */
+body:not(.ext-ui) #hud-board, body:not(.ext-ui) #minimap { display: none; }
+@media (max-width: 560px) {
+  body:not(.ext-ui) .hud-timer { top: calc(10px + var(--safe-t)); }
+}
