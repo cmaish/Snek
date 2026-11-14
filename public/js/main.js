@@ -371,9 +371,44 @@ async function startGame(boosters) {
 /** On Android browsers (not installed), go fullscreen for a proper game feel. */
 function goFullscreen() {
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-  if (standalone || !matchMedia('(pointer: coarse)').matches || document.fullscreenElement) return;
+  if (standalone || !matchMedia('(pointer: coarse)').matches || fsElement()) return;
+  enterFullscreen();
+}
+
+// --------------------------------------------------------- fullscreen ----
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+
+/** Fullscreen works on desktops, Android and iPads — not iPhones or the installed app. */
+function canFullscreen() {
   const el = document.documentElement;
-  try { el.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {}); } catch { /* ignore */ }
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  return !standalone && !!(el.requestFullscreen || el.webkitRequestFullscreen) && (document.fullscreenEnabled ?? document.webkitFullscreenEnabled ?? true);
+}
+
+function enterFullscreen() {
+  const el = document.documentElement;
+  try {
+    const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : el.webkitRequestFullscreen();
+    p?.catch?.(() => {});
+  } catch { /* ignore */ }
+}
+
+function toggleFullscreen() {
+  tap();
+  if (fsElement()) {
+    try { (document.exitFullscreen || document.webkitExitFullscreen).call(document)?.catch?.(() => {}); } catch { /* ignore */ }
+  } else enterFullscreen();
+}
+
+const FS_ENTER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>';
+const FS_EXIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></svg>';
+
+function updateFullscreenButton() {
+  const b = $('#btn-fullscreen');
+  b.innerHTML = fsElement() ? FS_EXIT : FS_ENTER;
+  b.classList.toggle('hidden', !canFullscreen());
+  b.classList.toggle('on', !!fsElement());
+  b.setAttribute('aria-label', fsElement() ? 'Exit full screen' : 'Full screen');
 }
 
 function pauseGame() {
@@ -624,6 +659,10 @@ async function boot() {
     installEvt = e;
     if (state === 'home') refreshHome();
   });
+  on('#btn-fullscreen', toggleFullscreen);
+  document.addEventListener('fullscreenchange', updateFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+  updateFullscreenButton();
   on('#btn-install', async () => {
     if (!installEvt) return;
     installEvt.prompt();
