@@ -1,5 +1,6 @@
 // Drawing helpers: cached sprites, snake faces, hats and skin previews.
 import { TAU, shade, mix, hslHex, FONT } from './util.js';
+import { drawCharHead, headTop } from './heads.js';
 
 const SPR = 96; // sprite resolution for body balls
 
@@ -527,6 +528,19 @@ export function taper(i, n) {
 /** Draws a wiggling snake wearing `skin` into a canvas context. */
 export function drawSnakePreview(g, skin, w, h, t = 0, opts = {}) {
   const p = prepSkin(skin);
+  if (opts.portrait) {
+    // just the head, big and centred (shop cards for heads)
+    const r = h * 0.3, x = w / 2, y = h * 0.56;
+    g.fillStyle = 'rgba(10,8,40,0.18)';
+    g.beginPath(); g.ellipse(x, h * 0.92, r * 0.9, r * 0.18, 0, 0, TAU); g.fill();
+    if (opts.head && opts.head !== 'snake') {
+      drawCharHead(g, x, y, r, opts.head, skin, { t, look: 0.4 });
+    } else {
+      g.drawImage(segSprite(p, 0, 1, t), x - r, y - r, r * 2, r * 2);
+      drawFace(g, x, y, r, -Math.PI / 2, { ...skin, hat: 'none' }, { t });
+    }
+    return;
+  }
   const n = opts.segments || 16;
   const r = Math.min(h * 0.15, w * 0.07);
   const x0 = w * 0.1, x1 = w * 0.8;
@@ -548,6 +562,12 @@ export function drawSnakePreview(g, skin, w, h, t = 0, opts = {}) {
   }
   const [hx, hy] = pts[0];
   const ang = Math.atan2(hy - pts[1][1], hx - pts[1][0]);
+  if (opts.head && opts.head !== 'snake') {
+    const cr = r * 1.55;
+    drawCharHead(g, hx, hy, cr, opts.head, skin, { t, blink: (t % 3.2) < 0.12 ? 1 : 0, look: 0 });
+    if (skin.hat && skin.hat !== 'none') drawHat(g, skin.hat, hx, hy - cr * Math.min(1.25, headTop(opts.head) * 0.8), cr * 0.85, t);
+    return;
+  }
   const hr = r * 1.25;
   g.drawImage(segSprite(p, 0, n, t), hx - hr, hy - hr, hr * 2, hr * 2);
   const blink = (t % 3.2) < 0.12 ? 1 : 0;

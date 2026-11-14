@@ -9,6 +9,7 @@
 // This is deliberately kept apart from the player's progress (coins,
 // unlocked skins, best score), which lives in storage.js.
 import { DEFAULT_SKINS, sanitizeSkinList } from './skins.js';
+import { HEAD_DEFS } from './heads.js';
 import { clamp } from './util.js';
 
 const ADMIN_KEY = 'snek.admin.v1';
@@ -129,6 +130,41 @@ export function resetSkins() {
   writeLocal();
 }
 
+// -------------------------------------------------------------- heads ----
+// Heads are built in; config.json / the admin menu can override each head's
+// price and hide it: { heads: { shiba: { price: 0, hidden: false }, ... } }
+function sanitizeHeadMap(m) {
+  const out = {};
+  if (!m || typeof m !== 'object') return out;
+  for (const [id, v] of Object.entries(m)) {
+    if (!HEAD_DEFS[id] || !v || typeof v !== 'object') continue;
+    const o = {};
+    if (v.price !== undefined && Number.isFinite(Number(v.price))) o.price = Math.max(0, Math.round(Number(v.price)));
+    if (typeof v.hidden === 'boolean') o.hidden = v.hidden;
+    out[id] = o;
+  }
+  return out;
+}
+
+export function getHeads() {
+  const srv = sanitizeHeadMap(server.heads), loc = sanitizeHeadMap(local.heads);
+  return Object.entries(HEAD_DEFS).map(([id, d]) => {
+    const o = { id, name: d.name, price: d.price, hidden: false, ...srv[id], ...loc[id] };
+    if (id === 'snake') { o.price = 0; o.hidden = false; }
+    return o;
+  });
+}
+
+export function saveHeads(list) {
+  local.heads = sanitizeHeadMap(Object.fromEntries(list.map((h) => [h.id, { price: h.price, hidden: h.hidden }])));
+  writeLocal();
+}
+
+export function resetHeads() {
+  delete local.heads;
+  writeLocal();
+}
+
 // ---------------------------------------------------------------- PIN ----
 // Not real security (it's all client-side) — just enough to keep small
 // fingers out of the grown-up menu.
@@ -165,6 +201,7 @@ export function exportConfig(includePin) {
     _about: 'Snek Arena config. Upload as config.json next to index.html to make these the defaults on every device.',
     settings: getSettings(),
     skins: getSkins(),
+    heads: Object.fromEntries(getHeads().map((h) => [h.id, { price: h.price, hidden: h.hidden }])),
   };
   if (includePin) out.adminPinHash = currentPinHash();
   return JSON.stringify(out, null, 2);
@@ -181,9 +218,14 @@ export function importConfig(text) {
     saveSkins(list);
     changed++;
   }
+  if (data.heads && typeof data.heads === 'object') {
+    local.heads = sanitizeHeadMap(data.heads);
+    writeLocal();
+    changed++;
+  }
   if (typeof data.adminPinHash === 'string' && /^[0-9a-f]{8}$/.test(data.adminPinHash)) {
     local.pinHash = data.adminPinHash;
     writeLocal();
   }
-  if (!changed) throw new Error('No "settings" or "skins" found in that file');
+  if (!changed) throw new Error('No "settings", "skins" or "heads" found in that file');
 }

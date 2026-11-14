@@ -3,10 +3,10 @@
 // progress unless you use the "Player progress" tab on purpose.
 import {
   getSettings, saveSettings, resetSettings,
-  getSkins, saveSkins, resetSkins,
+  getSkins, saveSkins, resetSkins, getHeads, saveHeads, resetHeads,
   checkPin, setPin, isDefaultPin, exportConfig, importConfig,
 } from './config.js';
-import { progress, saveProgress, resetProgress } from './storage.js';
+import { progress, saveProgress, resetProgress, isHeadUnlocked } from './storage.js';
 import { PATTERNS, EYES, HATS, sanitizeSkin, slugify } from './skins.js';
 import { drawSnakePreview } from './render.js';
 import { sfx } from './audio.js';
@@ -84,6 +84,7 @@ function openAdmin() {
       </header>
       <nav class="admin-tabs">
         <button data-tab="skins">🎨 Skins</button>
+        <button data-tab="heads">🐶 Heads</button>
         <button data-tab="game">🎮 Game rules</button>
         <button data-tab="progress">🪙 Player progress</button>
         <button data-tab="backup">💾 Backup</button>
@@ -110,6 +111,7 @@ function render() {
   const body = $('#adm-body');
   body.scrollTop = 0;
   if (tab === 'skins') editing ? renderEditor(body) : renderSkinList(body);
+  else if (tab === 'heads') renderHeads(body);
   else if (tab === 'game') renderGame(body);
   else if (tab === 'progress') renderProgress(body);
   else if (tab === 'backup') renderBackup(body);
@@ -288,6 +290,58 @@ function renderEditor(body) {
   previewRaf = requestAnimationFrame(loop);
 }
 
+// -------------------------------------------------------------- heads ----
+function renderHeads(body) {
+  const heads = getHeads();
+  const skin = getSkins()[0];
+  body.innerHTML = `
+    <p class="muted">Character heads your child can buy in the shop and wear with any body. Set a price (0 = free) or hide a head.</p>
+    <div class="admin-actions">
+      <button class="btn btn-small btn-green" id="h-free">Make every head free</button>
+      <button class="btn btn-small btn-ghost" id="h-reset">Restore default prices</button>
+    </div>
+    <ul class="skin-rows head-rows">${heads.map((h, i) => `
+      <li data-i="${i}">
+        <canvas></canvas>
+        <div class="meta"><b>${esc(h.name)}</b>
+          <span>${isHeadUnlocked(h) ? '<em class="tag ok">Owned</em>' : ''}${progress.selectedHead === h.id ? '<em class="tag ok">Wearing</em>' : ''}</span>
+        </div>
+        ${h.id === 'snake' ? '<span class="muted">always free</span>' : `
+        <label class="mini">🪙<input type="number" min="0" step="10" value="${h.price}" data-k="price"></label>
+        <label class="mini check"><input type="checkbox" data-k="hidden" ${h.hidden ? 'checked' : ''}> Hide</label>`}
+      </li>`).join('')}
+    </ul>`;
+  body.querySelectorAll('.head-rows li').forEach((li) => {
+    const h = heads[+li.dataset.i];
+    requestAnimationFrame(() => {
+      const cv = $('canvas', li), dpr = Math.min(2, window.devicePixelRatio || 1);
+      cv.width = 56 * dpr; cv.height = 56 * dpr;
+      const g = cv.getContext('2d');
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawSnakePreview(g, skin, 56, 56, 0.6, { head: h.id, portrait: true });
+    });
+    li.querySelectorAll('[data-k]').forEach((el) => el.addEventListener('change', () => {
+      const list = getHeads();
+      const item = list.find((x) => x.id === h.id);
+      if (el.dataset.k === 'price') item.price = Math.max(0, Math.round(+el.value || 0));
+      else item.hidden = el.checked;
+      saveHeads(list);
+    }));
+  });
+  $('#h-free').addEventListener('click', () => {
+    if (!confirm('Make every head free?')) return;
+    saveHeads(getHeads().map((h) => ({ ...h, price: 0 })));
+    render();
+    flash('All heads are free');
+  });
+  $('#h-reset').addEventListener('click', () => {
+    if (!confirm('Restore the default head prices and show every head?')) return;
+    resetHeads();
+    render();
+    flash('Head prices restored');
+  });
+}
+
 // --------------------------------------------------------------- game ----
 const FIELDS = [
   { h: 'Opponents' },
@@ -380,8 +434,8 @@ function renderProgress(body) {
       </div>
       <h3>Skins</h3>
       <div class="admin-actions">
-        <button class="btn btn-small btn-blue" id="p-unlock">Unlock every skin</button>
-        <button class="btn btn-small btn-ghost" id="p-lock">Re-lock bought skins</button>
+        <button class="btn btn-small btn-blue" id="p-unlock">Unlock every skin &amp; head</button>
+        <button class="btn btn-small btn-ghost" id="p-lock">Re-lock bought skins &amp; heads</button>
       </div>
       <h3>Reset</h3>
       <div class="admin-actions">
@@ -394,12 +448,14 @@ function renderProgress(body) {
   body.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => { progress.coins += +b.dataset.add; done(`Added ${b.dataset.add} coins`); }));
   $('#p-unlock').addEventListener('click', () => {
     progress.unlocked = [...new Set([...progress.unlocked, ...getSkins().map((s) => s.id)])];
-    done('All skins unlocked');
+    progress.unlockedHeads = getHeads().map((h) => h.id);
+    done('Everything unlocked');
   });
   $('#p-lock').addEventListener('click', () => {
-    if (!confirm('Lock all bought skins again? (Free skins stay unlocked.)')) return;
+    if (!confirm('Lock all bought skins and heads again? (Free ones stay unlocked.)')) return;
     progress.unlocked = [];
-    done('Bought skins locked');
+    progress.unlockedHeads = [];
+    done('Bought items locked');
   });
   $('#p-best').addEventListener('click', () => { if (confirm('Reset the best score?')) { progress.best = 0; done('Best score reset'); } });
   $('#p-reset').addEventListener('click', () => {

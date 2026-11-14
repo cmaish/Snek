@@ -115,10 +115,11 @@ export class Game {
   }
 
   // ------------------------------------------------------------ setup ----
-  setup(mode, { settings, skins, skin, name, boosters = [] }) {
+  setup(mode, { settings, skins, skin, name, boosters = [], head = 'snake', heads = [] }) {
     this.mode = mode;
     this.settings = settings;
     this.skins = skins;
+    this.botHeads = heads.filter((h) => h !== 'snake');
     this.botSkins = skins.filter((s) => s.bots);
     if (!this.botSkins.length) this.botSkins = skins;
     this.R = ARENA[settings.arenaSize] || ARENA.medium;
@@ -172,7 +173,7 @@ export class Game {
     if (mode === 'play') {
       const B = this.boosters;
       this.player = new Snake({
-        name, skin, isPlayer: true, x: 0, y: 0, angle: rand(TAU),
+        name, skin, headId: head, isPlayer: true, x: 0, y: 0, angle: rand(TAU),
         length: settings.startLength + (B.has('size') ? 25 : 0),
         ghost: Math.max(settings.spawnShield, B.has('shield') ? 12 : 0),
         speedMul: settings.playerSpeed,
@@ -271,6 +272,7 @@ export class Game {
     }
     const b = new Snake({
       name, skin: pick(this.botSkins), x, y, angle: rand(TAU),
+      headId: this.botHeads.length && Math.random() < 0.6 ? pick(this.botHeads) : null,
       length: clamp(len, 5, 400), ghost: initial ? 0 : 1.2, speedMul: this.diff.speed,
     });
     b.ai = newBrain();
@@ -388,11 +390,6 @@ export class Game {
       sfx.levelup();
       this.haptic(25);
     }
-    // first time becoming the biggest snake
-    if (!this.wasLeader && this.time > 5 && this.ranking()[0] === P) {
-      this.wasLeader = true;
-      if (this.hooks.toast) this.hooks.toast("👑 You're the BIGGEST snake!");
-    }
   }
 
   updatePellets(dt) {
@@ -497,7 +494,6 @@ export class Game {
       this.freezeT = def.time;
       this.freezer = s;
       sfx.freeze();
-      if (!me && this.player && this.player.alive && this.hooks.toast) this.hooks.toast(`❄️ ${s.name} froze everyone! Brrr!`);
     } else if (type === 'feast') {
       for (let i = 0; i < 28; i++) {
         const a = rand(TAU), d = rand(90, 260);
@@ -643,7 +639,6 @@ export class Game {
     if (killer) {
       killer.kills++;
       killer.mouth = 1;
-      if (this.hooks.feed && this.mode === 'play') this.hooks.feed(killer.name, victim.name, killer.isPlayer, victim.isPlayer);
     }
     if (victim.isPlayer && this.lives > 0 && !this.over) {
       this.revivePlayer(killer);
@@ -1119,9 +1114,8 @@ export class Game {
       const h = s.head;
       if (h.x < view.x0 || h.x > view.x1 || h.y < view.y0 || h.y > view.y1) continue;
       const p = this.worldToScreen(h);
-      const hr = s.radius() * 1.24 * sc;
-      const hatH = s.skin.hat !== 'none' ? hr * 1.1 : 0;
-      let y = p.y - hr - hatH - 16;
+      const hr = s.radius() * sc;
+      let y = p.y - hr * s.labelLift() - 14;
       const size = clamp(13 + hr * 0.22, 13, 20);
       // badge colour: green = you can eat it, red = it can eat you
       let bg = 'rgba(30,15,80,0.8)';

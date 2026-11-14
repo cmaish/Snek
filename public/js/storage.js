@@ -18,6 +18,8 @@ const DEFAULTS = {
   lastGift: '',
   giftStreak: 0,
   bestStreak: 0,
+  unlockedHeads: [],
+  selectedHead: 'snake',
 };
 
 function load() {
@@ -25,6 +27,7 @@ function load() {
   try { p = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { p = {}; }
   const out = { ...DEFAULTS, ...p };
   if (!Array.isArray(out.unlocked)) out.unlocked = [];
+  if (!Array.isArray(out.unlockedHeads)) out.unlockedHeads = [];
   out.coins = Math.max(0, Math.floor(Number(out.coins) || 0));
   return out;
 }
@@ -37,7 +40,7 @@ export function saveProgress() {
 
 export function resetProgress() {
   const keep = { sound: progress.sound, music: progress.music, name: progress.name };
-  Object.assign(progress, { ...DEFAULTS, ...keep, unlocked: [] });
+  Object.assign(progress, { ...DEFAULTS, ...keep, unlocked: [], unlockedHeads: [] });
   saveProgress();
 }
 
@@ -53,4 +56,17 @@ export function ensureSelected(skins) {
   progress.selected = fallback.id;
   saveProgress();
   return fallback;
+}
+
+export function isHeadUnlocked(head) {
+  return !!head && (head.price <= 0 || progress.unlockedHeads.includes(head.id));
+}
+
+/** Make sure the selected head exists, is visible and unlocked. */
+export function ensureHead(heads) {
+  const cur = heads.find((h) => h.id === progress.selectedHead);
+  if (cur && !cur.hidden && isHeadUnlocked(cur)) return cur;
+  progress.selectedHead = 'snake';
+  saveProgress();
+  return heads.find((h) => h.id === 'snake');
 }

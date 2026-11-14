@@ -1,5 +1,6 @@
 import { TAU, clamp, angleDiff, rand, hslHex } from './util.js';
-import { prepSkin, segSprite, drawFace, glowSprite, ballSprite, taper } from './render.js';
+import { prepSkin, segSprite, drawFace, drawHat, glowSprite, ballSprite, taper } from './render.js';
+import { drawCharHead, headTop } from './heads.js';
 
 let NEXT_ID = 1;
 export const BASE_SPEED = 170;
@@ -13,6 +14,7 @@ export class Snake {
     this.id = NEXT_ID++;
     this.name = o.name || 'Snek';
     this.setSkin(o.skin);
+    this.headId = o.headId && o.headId !== 'snake' ? o.headId : null;
     this.isPlayer = !!o.isPlayer;
     this.mass = o.length;
     this.maxMass = this.mass;
@@ -67,6 +69,9 @@ export class Snake {
   segTarget() { return clamp(Math.round(6 + this.mass * 0.55), 6, 220); }
 
   get size() { return Math.floor(this.mass); }
+
+  /** How far above the head centre the label should sit, in radii. */
+  labelLift() { return this.headId ? 1.55 * headTop(this.headId) : 1.24 * (this.skin.hat !== 'none' ? 2.1 : 1); }
 
   grow(v) {
     const g = v * (this.power.double > 0 ? 2 : 1);
@@ -253,6 +258,14 @@ export class Snake {
       g.arc(h.x, h.y, hr * 1.9, 0, TAU);
       g.fill();
       g.stroke();
+    }
+    if (this.headId) {
+      // character head: upright sticker that looks where it's going
+      const cr = r * 1.55;
+      drawCharHead(g, h.x, h.y, cr, this.headId, this.skin, { t, mouth: this.mouth, blink: this.blink, look: this.targetAngle });
+      if (this.skin.hat && this.skin.hat !== 'none') drawHat(g, this.skin.hat, h.x, h.y - cr * Math.min(1.25, headTop(this.headId) * 0.8), cr * 0.85, t);
+      g.restore();
+      return;
     }
     g.drawImage(segSprite(p, 0, n, t), h.x - hr, h.y - hr, hr * 2, hr * 2);
     if (this.frozen) {

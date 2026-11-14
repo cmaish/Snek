@@ -10,7 +10,9 @@ It's a Progressive Web App made of plain static files (HTML/CSS/JS, no build ste
 - **Bigger snakes eat smaller ones.** Bump into a smaller snake's body to chomp off its tail; hit it head-on to swallow it whole. Touch a bigger snake and *you* get eaten. Badges are **green** when you can eat that snake and **red** when it can eat you, and the screen edges glow red when a bigger snake is close.
 - Hold **BOOST** (button, second finger, mouse button or space) to zoom; it costs a little size.
 - Eat snakes quickly for combos (DOUBLE GULP!, TRIPLE GULP!…). Size milestones, kill feed, countdown, haptics, confetti and star ratings keep it lively.
-- Matches last 3 minutes by default. Finish as the biggest snake for bonus coins. Coins buy skins (19 skins with patterns, eyes and hats) and boosters.
+- Matches last 3 minutes by default. Finish as the biggest snake for bonus coins. Coins buy body skins (19, with patterns, eyes and hats), **character heads** and boosters.
+
+**Heads** (shop → 🐶 Heads; mix and match with any body): Classic Snek plus 41 characters — Shiba Inu, Puppy, Ginger Cat, Froggy, Chick, Mouse, Teddy Bear, Piggy, Hamster, Panda, Bunny, Dalmatian, Fox, Penguin, Koala, Sheep, Monkey, Raccoon, Cow, Owl, Husky, Black Cat, Polar Bear, Hedgehog, Tiger, Lion, Axolotl, Sloth, Bat, Reindeer, Shark, Dino, Ghost, Pumpkin, Robot, Alien, Ninja, Astronaut, Monster, Dragon and Unicorn. Dino, Dragon and Monster take their colour from the body skin. Bots wear random heads too.
 
 **In-game power-ups** (bubbles in the arena; arrows at the screen edge point to nearby ones):
 🧲 Magnet · ⚡ Zoom · ⭐ Super Star (invincible, eats anyone) · 2× Double growth · ❄️ Freeze (slows everyone else) · 🍰 Candy Rain (a shower of food) · 🍄 Giant (fights as if 50% bigger)
@@ -26,10 +28,11 @@ Tap the faint 🔒 in the bottom-right corner of the home screen (or open `…/#
 
 | Tab | What you can do |
 | --- | --- |
+| 🐶 Heads | Set each head's price (0 = free) or hide it; make every head free in one tap. |
 | 🎨 Skins | Create, edit, duplicate, reorder, hide or delete skins. Set colours, pattern, eyes, hat, price, "free for everyone", and whether bots can wear it. Live preview. |
 | 🎮 Game rules | Number of bots, difficulty, whether bots hunt the player, gentle mode (lose length instead of being eaten), match length, arena size, food amount, starting size, speed, spawn protection, boost on/off, names on/off, coin multiplier, which power-ups appear, booster prices (or turn boosters off), daily gift size. |
 | 🪙 Player progress | Set/add coins, unlock or re-lock skins, reset best score or all progress. |
-| 💾 Backup | Export skins + rules as `config.json`, or import one. |
+| 💾 Backup | Export skins, head prices + rules as `config.json`, or import one. |
 | 🔑 PIN | Change the PIN. |
 
 The admin config and the player's progress are stored **separately** in the browser (`snek.admin.v1` and `snek.progress.v1` in localStorage). Changing skins or rules never touches coins or unlocked skins unless you use the Player progress tab.
@@ -83,6 +86,7 @@ public/              ← upload this folder
     snake.js    snake movement & drawing
     bots.js     bot AI
     render.js   sprites, faces, hats, previews
+    heads.js    character heads (built from ears/muzzles/noses/markings)
     skins.js    default skins + validation
     config.js   admin config layers + PIN
     storage.js  player progress
@@ -90,7 +94,7 @@ public/              ← upload this folder
     input.js    touch / mouse / keyboard
     audio.js    synthesised sound effects + music
   icons/
-tools/               icon generator (not needed for hosting)
+tools/               icon generator + heads.html gallery (not needed for hosting)
 deploy.sh            S3/CloudFront upload helper
 ```
 

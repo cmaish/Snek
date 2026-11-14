@@ -1,6 +1,6 @@
 // App shell: screens, HUD, shop, boosters, results, and wiring everything together.
-import { loadConfig, getSettings, getSkins } from './config.js';
-import { progress, saveProgress, isUnlocked, ensureSelected } from './storage.js';
+import { loadConfig, getSettings, getSkins, getHeads } from './config.js';
+import { progress, saveProgress, isUnlocked, ensureSelected, isHeadUnlocked, ensureHead } from './storage.js';
 import { Game } from './game.js';
 import { Input } from './input.js';
 import { initAudio, sfx, setSound, setMusic, suspend } from './audio.js';
@@ -19,6 +19,7 @@ let settingsReturn = 'home';
 let wakeLock = null;
 let installEvt = null;
 let picked = new Set();
+let shopTab = 'bodies';
 
 export function show(name) {
   state = name;
@@ -69,7 +70,7 @@ function previewLoop(ts) {
   const g = c.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, h);
-  drawSnakePreview(g, ensureSelected(getSkins()), w, h, t, { segments: 18 });
+  drawSnakePreview(g, ensureSelected(getSkins()), w, h, t, { segments: 18, head: ensureHead(getHeads()).id });
 }
 
 // ---------------------------------------------------------- settings ----
@@ -125,6 +126,8 @@ function openShop() {
 }
 
 function renderShop() {
+  for (const b of document.querySelectorAll('.shop-tab')) b.classList.toggle('active', b.dataset.tab === shopTab);
+  if (shopTab === 'heads') return renderHeadShop();
   const grid = $('#shop-grid');
   grid.innerHTML = '';
   const skins = getSkins().filter((s) => !s.hidden);
@@ -151,7 +154,7 @@ function renderShop() {
       cv.width = w * dpr; cv.height = h * dpr;
       const g = cv.getContext('2d');
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawSnakePreview(g, skin, w, h, 0.6, { segments: 12 });
+      drawSnakePreview(g, skin, w, h, 0.6, { segments: 12, head: ensureHead(getHeads()).id });
     });
     card.addEventListener('click', () => {
       initAudio();
@@ -189,6 +192,71 @@ function renderShop() {
       renderShop();
       updateCoins();
     });
+  }
+  updateCoins();
+}
+
+/** One buy/wear card for the shop (used for heads). */
+function shopCard({ name, price, owned, selected, draw, onWear, onBuy }) {
+  const card = document.createElement('button');
+  card.className = 'skin-card head-card' + (owned ? '' : ' locked') + (selected ? ' selected' : '');
+  const cv = document.createElement('canvas');
+  const status = document.createElement('div');
+  status.className = 'skin-status';
+  const label = () => (selected ? '✅ Wearing' : owned ? 'Tap to wear' : `🪙 ${price.toLocaleString()}`);
+  status.textContent = label();
+  card.innerHTML = `<div class="skin-name">${esc(name)}</div>${owned ? '' : '<span class="lock">🔒</span>'}`;
+  card.prepend(cv);
+  card.append(status);
+  requestAnimationFrame(() => {
+    const w = cv.clientWidth || 140, h = cv.clientHeight || 96, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = w * dpr; cv.height = h * dpr;
+    const g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw(g, w, h);
+  });
+  card.addEventListener('click', () => {
+    initAudio();
+    if (owned) { tap(); onWear(); return; }
+    if (progress.coins < price) {
+      sfx.error();
+      haptic(40);
+      status.textContent = `Need 🪙 ${(price - progress.coins).toLocaleString()} more`;
+      shake(card);
+      setTimeout(() => (status.textContent = label()), 1600);
+      return;
+    }
+    if (!card.dataset.confirm) {
+      card.dataset.confirm = '1';
+      status.textContent = 'Tap again to buy!';
+      card.classList.add('confirm');
+      tap();
+      setTimeout(() => { delete card.dataset.confirm; card.classList.remove('confirm'); status.textContent = label(); }, 2500);
+      return;
+    }
+    progress.coins -= price;
+    sfx.win();
+    haptic([20, 40, 20]);
+    const r = card.getBoundingClientRect();
+    confetti(60, r.left + r.width / 2, r.top + r.height / 2);
+    onBuy();
+  });
+  return card;
+}
+
+function renderHeadShop() {
+  const grid = $('#shop-grid');
+  grid.innerHTML = '';
+  const skin = ensureSelected(getSkins());
+  const sel = ensureHead(getHeads());
+  for (const head of getHeads().filter((h) => !h.hidden)) {
+    const wear = () => { progress.selectedHead = head.id; saveProgress(); renderShop(); };
+    grid.append(shopCard({
+      name: head.name, price: head.price, owned: isHeadUnlocked(head), selected: head.id === sel.id,
+      draw: (g, w, h) => drawSnakePreview(g, skin, w, h, 0.6, { head: head.id, portrait: true }),
+      onWear: wear,
+      onBuy: () => { progress.unlockedHeads.push(head.id); wear(); updateCoins(); },
+    }));
   }
   updateCoins();
 }
@@ -251,9 +319,13 @@ function renderBoosters() {
 }
 
 // ------------------------------------------------------------- play ----
+function visibleHeads() {
+  return getHeads().filter((h) => !h.hidden).map((h) => h.id);
+}
+
 function startDemo() {
   input.enabled = false;
-  game.setup('demo', { settings: { ...getSettings(), arenaSize: 'small', showNames: true }, skins: getSkins() });
+  game.setup('demo', { settings: { ...getSettings(), arenaSize: 'small', showNames: true }, skins: getSkins(), heads: visibleHeads() });
 }
 
 async function startGame(boosters) {
@@ -267,13 +339,12 @@ async function startGame(boosters) {
   if (cost > progress.coins) return;
   progress.coins -= cost;
   saveProgress();
-  game.setup('play', { settings, skins, skin, name: progress.name.trim() || 'You', boosters: list });
+  game.setup('play', { settings, skins, skin, name: progress.name.trim() || 'You', boosters: list, head: ensureHead(getHeads()).id, heads: visibleHeads() });
   input.reset();
   input.enabled = true;
   $('#btn-boost').classList.toggle('hidden', !settings.boostEnabled);
   $('#hud-timer').classList.toggle('hidden', settings.matchSeconds <= 0);
   $('#toasts').innerHTML = '';
-  $('#feed').innerHTML = '';
   document.body.classList.toggle('boost-left', progress.boostLeft);
   show('play');
   goFullscreen();
@@ -354,17 +425,6 @@ function toast(msg, ms = 2200) {
   box.append(el);
   setTimeout(() => el.classList.add('out'), ms - 300);
   setTimeout(() => el.remove(), ms);
-}
-
-function feed(killer, victim, byPlayer, ofPlayer) {
-  const box = $('#feed');
-  const el = document.createElement('div');
-  el.className = 'feed-item' + (byPlayer ? ' good' : ofPlayer ? ' bad' : '');
-  el.innerHTML = `<b>${esc(byPlayer ? 'You' : killer)}</b> 😋 ${esc(ofPlayer ? 'you' : victim)}`;
-  box.prepend(el);
-  while (box.children.length > 3) box.lastChild.remove();
-  setTimeout(() => el.classList.add('out'), 3200);
-  setTimeout(() => el.remove(), 3600);
 }
 
 function onEnd(r) {
@@ -482,7 +542,7 @@ async function boot() {
   ensureSelected(getSkins());
   setSound(progress.sound);
   setMusic(progress.music);
-  game = new Game($('#game'), { onHud, onEnd, toast, feed, haptic });
+  game = new Game($('#game'), { onHud, onEnd, toast, haptic });
   input = new Input($('#game'));
   game.input = input;
   window.snek = { game }; // handy for debugging from the console
@@ -506,6 +566,7 @@ async function boot() {
   on('#btn-help', () => { tap(); show('help'); });
   on('#btn-help-close', () => { tap(); show('home'); });
   on('#btn-shop-back', () => { tap(); show('home'); });
+  for (const b of document.querySelectorAll('.shop-tab')) b.addEventListener('click', () => { tap(); shopTab = b.dataset.tab; renderShop(); $('#shop-grid').scrollTop = 0; });
   on('#btn-pause', pauseGame);
   on('#btn-resume', resumeGame);
   on('#btn-quit', () => { tap(); quitGame(); });
