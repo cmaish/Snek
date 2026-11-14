@@ -137,7 +137,7 @@ export function pelletSprite(color) {
   c = mk(64);
   const g = c.getContext('2d');
   const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32);
-  gr.addColorStop(0, color + 'cc');
+  gr.addColorStop(0, color + 'ee');
   gr.addColorStop(0.45, color + '55');
   gr.addColorStop(1, color + '00');
   g.fillStyle = gr;
@@ -147,7 +147,7 @@ export function pelletSprite(color) {
   core.addColorStop(0.35, shade(color, 0.35));
   core.addColorStop(1, color);
   g.fillStyle = core;
-  circle(g, 32, 32, 12);
+  circle(g, 32, 32, 14);
   pelletCache.set(color, c);
   return c;
 }
@@ -167,28 +167,40 @@ const starCache = new Map();
 export function starSprite(color) {
   let c = starCache.get(color);
   if (c) return c;
-  c = mk(64);
+  c = mk(128);
   const g = c.getContext('2d');
-  const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32);
-  gr.addColorStop(0, color + 'bb');
+  const gr = g.createRadialGradient(64, 64, 10, 64, 64, 64);
+  gr.addColorStop(0, color + 'dd');
+  gr.addColorStop(0.5, color + '55');
   gr.addColorStop(1, color + '00');
   g.fillStyle = gr;
-  g.fillRect(0, 0, 64, 64);
-  g.beginPath();
-  for (let i = 0; i < 10; i++) {
-    const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 7 : 16;
-    g.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r);
-  }
-  g.closePath();
-  const core = g.createLinearGradient(20, 18, 44, 46);
+  g.fillRect(0, 0, 128, 128);
+  const star = () => {
+    g.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 19 : 40;
+      g.lineTo(64 + Math.cos(a) * r, 64 + Math.sin(a) * r);
+    }
+    g.closePath();
+  };
+  star();
+  g.lineJoin = 'round';
+  g.lineWidth = 10;
+  g.strokeStyle = shade(color, -0.45);
+  g.stroke();
+  g.lineWidth = 6;
+  g.strokeStyle = '#ffffff';
+  g.stroke();
+  const core = g.createLinearGradient(40, 34, 88, 94);
   core.addColorStop(0, '#ffffff');
-  core.addColorStop(0.4, shade(color, 0.3));
+  core.addColorStop(0.35, shade(color, 0.35));
   core.addColorStop(1, color);
   g.fillStyle = core;
   g.fill();
-  g.lineWidth = 2;
-  g.strokeStyle = shade(color, -0.3);
-  g.stroke();
+  g.fillStyle = 'rgba(255,255,255,0.75)';
+  g.beginPath();
+  g.ellipse(54, 50, 8, 5, -0.6, 0, TAU);
+  g.fill();
   starCache.set(color, c);
   return c;
 }

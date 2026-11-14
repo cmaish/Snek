@@ -198,9 +198,9 @@ export class Game {
 
   spawnNatural() {
     const a = rand(TAU), d = Math.sqrt(Math.random()) * (this.R - 40);
-    const big = Math.random() < 0.06;
-    const p = this.makePellet(Math.cos(a) * d, Math.sin(a) * d, big ? 4 : 1, pick(PELLET_COLORS), true);
-    if (big) { p.star = true; p.r = 13; p.c = pick(['#ffd23f', '#ff9ff3', '#7cff6b', '#5fd3ff']); }
+    const big = Math.random() < 0.1;
+    const p = this.makePellet(Math.cos(a) * d, Math.sin(a) * d, big ? 5 : 1, pick(PELLET_COLORS), true);
+    if (big) { p.star = true; p.r = 17; p.c = pick(['#ffd23f', '#ff9ff3', '#7cff6b', '#5fd3ff']); }
     this.pellets.push(p);
     this.natural++;
   }
@@ -946,14 +946,20 @@ export class Game {
       if (p.x < view.x0 || p.x > view.x1 || p.y < view.y0 || p.y > view.y1) continue;
       const pulse = 1 + 0.14 * Math.sin(t * 4 + p.ph);
       if (p.star) {
-        const s = p.r * 3.4 * pulse;
+        // big, bouncy, spinning star with a pulsing halo so it's easy to spot
+        const k = 1 + 0.2 * Math.sin(t * 5 + p.ph);
+        const hs = p.r * 5.5 * k;
+        g.globalAlpha = 0.5;
+        g.drawImage(glowSprite(p.c), p.x - hs / 2, p.y - hs / 2, hs, hs);
+        g.globalAlpha = 1;
+        const s = p.r * 4.4 * (1 + 0.1 * Math.sin(t * 5 + p.ph));
         g.save();
-        g.translate(p.x, p.y);
-        g.rotate(t * 1.5 + p.ph);
+        g.translate(p.x, p.y - Math.abs(Math.sin(t * 3 + p.ph)) * 5);
+        g.rotate(Math.sin(t * 2 + p.ph) * 0.35);
         g.drawImage(starSprite(p.c), -s / 2, -s / 2, s, s);
         g.restore();
       } else {
-        const s = p.r * 3.2 * pulse;
+        const s = p.r * 3.6 * pulse;
         g.drawImage(pelletSprite(p.c), p.x - s / 2, p.y - s / 2, s, s);
       }
     }
@@ -1002,7 +1008,7 @@ export class Game {
 
     // ---- screen-space overlays
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.drawMotes(g, sc);
+    if (this.mode !== 'play') this.drawMotes(g, sc);
     if (this.lines.length) {
       g.strokeStyle = 'rgba(255,255,255,0.35)';
       g.lineWidth = 2;

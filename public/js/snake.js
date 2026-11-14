@@ -3,7 +3,7 @@ import { prepSkin, segSprite, drawFace, drawHat, glowSprite, ballSprite, taper }
 import { drawCharHead, headTop } from './heads.js';
 
 let NEXT_ID = 1;
-export const BASE_SPEED = 140;
+export const BASE_SPEED = 175;
 const SPACING = 0.5;     // segment spacing as a fraction of radius
 const MIN_BOOST = 8;     // can't boost below this length
 const BOOST_DRAIN = 2.2; // length lost per second while boosting
@@ -86,7 +86,7 @@ export class Snake {
     const r = this.radius();
     this.frozen = game.freezeT > 0 && game.freezer !== this && this.power.shield <= 0;
     // Steering: bigger snakes turn a little slower.
-    const turn = (5.4 / (1 + (r - 10) * 0.035)) * (this.frozen ? 0.6 : 1) * dt;
+    const turn = (6.2 / (1 + (r - 10) * 0.035)) * (this.frozen ? 0.6 : 1) * dt;
     const d = angleDiff(this.targetAngle, this.angle);
     this.angle += d > turn ? turn : d < -turn ? -turn : d;
 
