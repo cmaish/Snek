@@ -20,6 +20,18 @@ let editing = null;      // skin draft being edited
 let editingIndex = -1;
 let previewRaf = 0;
 
+/** In-page yes/no box (browser confirm() dialogs are blocked in some viewers). */
+function ask(msg) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'ask-wrap';
+    wrap.innerHTML = `<div class="card ask-card"><p>${esc(msg)}</p>
+      <div class="row"><button class="btn btn-small btn-ghost" data-v="0">Cancel</button><button class="btn btn-small btn-red" data-v="1">Yes, do it</button></div></div>`;
+    document.body.append(wrap);
+    wrap.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { wrap.remove(); resolve(b.dataset.v === '1'); }));
+  });
+}
+
 // ---------------------------------------------------------------- PIN ----
 export function openPin(c) {
   ctx = c;
@@ -93,7 +105,7 @@ function openAdmin() {
       <div class="admin-body" id="adm-body"></div>
     </div>`;
   $('#adm-close', root).addEventListener('click', closeAdmin);
-  root.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { tab = b.dataset.tab; editing = null; render(); }));
+  root.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', async () => { tab = b.dataset.tab; editing = null; render(); }));
   ctx.show('admin');
   render();
 }
@@ -165,7 +177,7 @@ function renderSkinList(body) {
   body.querySelectorAll('.skin-rows li').forEach((li) => {
     const i = +li.dataset.i;
     requestAnimationFrame(() => drawStatic($('canvas', li), skins[i]));
-    li.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
+    li.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', async () => {
       const list = getSkins();
       const act = b.dataset.act;
       if (act === 'edit') { editing = { ...list[i], colors: [...list[i].colors] }; editingIndex = i; render(); return; }
@@ -174,7 +186,7 @@ function renderSkinList(body) {
         list.splice(i + 1, 0, copy);
       } else if (act === 'del') {
         if (list.length <= 1) return flash('You need at least one skin', true);
-        if (!confirm(`Delete "${list[i].name}"?`)) return;
+        if (!await ask(`Delete "${list[i].name}"?`)) return;
         list.splice(i, 1);
       } else if (act === 'up' && i > 0) [list[i - 1], list[i]] = [list[i], list[i - 1]];
       else if (act === 'down' && i < list.length - 1) [list[i + 1], list[i]] = [list[i], list[i + 1]];
@@ -182,15 +194,15 @@ function renderSkinList(body) {
       render();
     }));
   });
-  $('#sk-new').addEventListener('click', () => {
+  $('#sk-new').addEventListener('click', async () => {
     const h = randInt(0, 359);
     editing = sanitizeSkin({ id: '', name: 'New Snake', colors: [hslHex(h, 85, 60), hslHex((h + 40) % 360, 85, 50)], pattern: 'stripes', stripe: 2, eyes: 'cute', hat: 'none', price: 100 });
     editing.id = '';
     editingIndex = -1;
     render();
   });
-  $('#sk-restore').addEventListener('click', () => {
-    if (!confirm('Replace the skin list with the default skins? Custom skins will be removed.')) return;
+  $('#sk-restore').addEventListener('click', async () => {
+    if (!await ask('Replace the skin list with the default skins? Custom skins will be removed.')) return;
     resetSkins();
     render();
     flash('Default skins restored');
@@ -232,8 +244,8 @@ function renderEditor(body) {
       <span class="color-chip"><input type="color" value="${c}" data-i="${i}">${d.colors.length > 1 ? `<button data-rm="${i}" aria-label="Remove colour">×</button>` : ''}</span>`).join('') +
       (d.colors.length < 8 ? '<button class="add-color" id="ed-add">+</button>' : '');
     wrap.querySelectorAll('input[type=color]').forEach((inp) => inp.addEventListener('input', () => { d.colors[+inp.dataset.i] = inp.value; }));
-    wrap.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => { d.colors.splice(+b.dataset.rm, 1); drawColors(); }));
-    $('#ed-add')?.addEventListener('click', () => { d.colors.push(hslHex(randInt(0, 359), 85, 60)); drawColors(); });
+    wrap.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', async () => { d.colors.splice(+b.dataset.rm, 1); drawColors(); }));
+    $('#ed-add')?.addEventListener('click', async () => { d.colors.push(hslHex(randInt(0, 359), 85, 60)); drawColors(); });
   };
   drawColors();
 
@@ -250,9 +262,9 @@ function renderEditor(body) {
   bind('#ed-hidden', 'hidden', (v) => v, 'change');
   bind('#ed-bots', 'bots', (v) => v, 'change');
 
-  $('#ed-back').addEventListener('click', () => { editing = null; render(); });
-  $('#ed-cancel').addEventListener('click', () => { editing = null; render(); });
-  $('#ed-random').addEventListener('click', () => {
+  $('#ed-back').addEventListener('click', async () => { editing = null; render(); });
+  $('#ed-cancel').addEventListener('click', async () => { editing = null; render(); });
+  $('#ed-random').addEventListener('click', async () => {
     const h = randInt(0, 359);
     const n = randInt(2, 4);
     d.colors = Array.from({ length: n }, (_, i) => hslHex((h + i * randInt(25, 70)) % 360, randInt(70, 95), randInt(45, 70)));
@@ -262,7 +274,7 @@ function renderEditor(body) {
     d.hat = pick(Object.keys(HATS));
     renderEditor(body);
   });
-  $('#ed-save').addEventListener('click', () => {
+  $('#ed-save').addEventListener('click', async () => {
     const list = getSkins();
     const s = sanitizeSkin(d);
     if (!d.id) s.id = slugify(s.name);
@@ -328,14 +340,14 @@ function renderHeads(body) {
       saveHeads(list);
     }));
   });
-  $('#h-free').addEventListener('click', () => {
-    if (!confirm('Make every head free?')) return;
+  $('#h-free').addEventListener('click', async () => {
+    if (!await ask('Make every head free?')) return;
     saveHeads(getHeads().map((h) => ({ ...h, price: 0 })));
     render();
     flash('All heads are free');
   });
-  $('#h-reset').addEventListener('click', () => {
-    if (!confirm('Restore the default head prices and show every head?')) return;
+  $('#h-reset').addEventListener('click', async () => {
+    if (!await ask('Restore the default head prices and show every head?')) return;
     resetHeads();
     render();
     flash('Head prices restored');
@@ -407,8 +419,8 @@ function renderGame(body) {
       saveSettings(cur);
     });
   });
-  $('#g-reset').addEventListener('click', () => {
-    if (!confirm('Restore the default game rules?')) return;
+  $('#g-reset').addEventListener('click', async () => {
+    if (!await ask('Restore the default game rules?')) return;
     resetSettings();
     render();
     flash('Default rules restored');
@@ -444,22 +456,22 @@ function renderProgress(body) {
       </div>
     </div>`;
   const done = (msg) => { saveProgress(); flash(msg); render(); };
-  $('#p-set').addEventListener('click', () => { progress.coins = Math.max(0, Math.floor(+$('#p-coins').value || 0)); done('Coins saved'); });
-  body.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => { progress.coins += +b.dataset.add; done(`Added ${b.dataset.add} coins`); }));
-  $('#p-unlock').addEventListener('click', () => {
+  $('#p-set').addEventListener('click', async () => { progress.coins = Math.max(0, Math.floor(+$('#p-coins').value || 0)); done('Coins saved'); });
+  body.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => { progress.coins += +b.dataset.add; done(`Added ${b.dataset.add} coins`); }));
+  $('#p-unlock').addEventListener('click', async () => {
     progress.unlocked = [...new Set([...progress.unlocked, ...getSkins().map((s) => s.id)])];
     progress.unlockedHeads = getHeads().map((h) => h.id);
     done('Everything unlocked');
   });
-  $('#p-lock').addEventListener('click', () => {
-    if (!confirm('Lock all bought skins and heads again? (Free ones stay unlocked.)')) return;
+  $('#p-lock').addEventListener('click', async () => {
+    if (!await ask('Lock all bought skins and heads again? (Free ones stay unlocked.)')) return;
     progress.unlocked = [];
     progress.unlockedHeads = [];
     done('Bought items locked');
   });
-  $('#p-best').addEventListener('click', () => { if (confirm('Reset the best score?')) { progress.best = 0; done('Best score reset'); } });
-  $('#p-reset').addEventListener('click', () => {
-    if (!confirm('Reset coins, unlocked skins, best score and stats? This cannot be undone.')) return;
+  $('#p-best').addEventListener('click', async () => { if (await ask('Reset the best score?')) { progress.best = 0; done('Best score reset'); } });
+  $('#p-reset').addEventListener('click', async () => {
+    if (!await ask('Reset coins, unlocked skins, best score and stats? This cannot be undone.')) return;
     resetProgress();
     flash('Progress reset');
     render();
@@ -487,7 +499,7 @@ function renderBackup(body) {
   const fill = () => { out.value = exportConfig($('#b-pin').checked); };
   fill();
   $('#b-pin').addEventListener('change', fill);
-  $('#b-dl').addEventListener('click', () => {
+  $('#b-dl').addEventListener('click', async () => {
     const blob = new Blob([out.value], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -502,7 +514,7 @@ function renderBackup(body) {
     const f = e.target.files[0];
     if (f) $('#b-in').value = await f.text();
   });
-  $('#b-import').addEventListener('click', () => {
+  $('#b-import').addEventListener('click', async () => {
     try {
       importConfig($('#b-in').value);
       flash('Imported!');
@@ -523,7 +535,7 @@ function renderPin(body) {
       <label>Repeat new PIN<input id="pin2" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></label>
       <div class="admin-actions"><button class="btn btn-small btn-green" id="pin-save">Change PIN</button></div>
     </div>`;
-  $('#pin-save').addEventListener('click', () => {
+  $('#pin-save').addEventListener('click', async () => {
     const a = $('#pin1').value, b = $('#pin2').value;
     if (!/^[0-9]{4,8}$/.test(a)) return flash('PIN must be 4–8 digits', true);
     if (a !== b) return flash("The PINs don't match", true);

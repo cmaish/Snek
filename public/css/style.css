@@ -609,3 +609,5 @@ body.boost-left #minimap { left: auto; right: calc(10px + var(--safe-r)); }
 .head-rows .mini { display: flex; align-items: center; gap: 4px; font-size: 14px; color: var(--ink); white-space: nowrap; }
 .head-rows .mini input[type=number] { width: 78px; font: inherit; font-size: 15px; padding: 6px 8px; border-radius: 10px; border: 2px solid #d9d2fa; }
 .head-rows .mini input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--purple); }
+.ask-wrap { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px; background: rgba(20, 10, 60, 0.55); }
+.ask-card { width: min(360px, 100%); font-weight: 700; }
