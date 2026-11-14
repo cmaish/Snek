@@ -619,19 +619,18 @@ export class Game {
   }
 
   bite(A, B, j) {
-    const n = B.segs.length;
     const cut = Math.max(3, j);
-    const keepMass = B.mass * (cut / n);
-    const keepSize = B.isPlayer && this.settings.gentle; // tail drops off but the player keeps their size
-    if (!keepSize && (keepMass < 5 || cut <= 3)) {
+    // a bite right behind the head swallows the whole snake (except a protected player)
+    if (cut <= 3 && !(B.isPlayer && this.settings.gentle)) {
       this.kill(B, A);
       return;
     }
-    const lost = B.mass - keepMass;
-    if (!keepSize) B.mass = keepMass;
-    const removed = B.segs.splice(cut); // (a kept-size tail grows back as it moves)
+    // otherwise the tail drops off for good, but the size number stays the same
+    const removed = B.segs.splice(cut);
+    if (!removed.length) return;
+    B.bodyLen = B.segs.length;
     const at = removed[0];
-    this.spawnRemains(removed, B, lost * (keepSize ? 0.5 : 0.85), A, 0.6);
+    this.spawnRemains(removed, B, removed.length * 1.1, A, 0.6);
     A.biteCd = 0.35;
     A.mouth = 1;
     B.hurt = 0.4;

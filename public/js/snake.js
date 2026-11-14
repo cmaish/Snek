@@ -59,6 +59,12 @@ export class Snake {
 
   get head() { return this.segs[0]; }
 
+  // The size number ("mass") and the body length are tracked separately:
+  // eating grows both, but a bitten-off tail is gone for good while the
+  // size number stays. Setting mass directly also resets the body to match.
+  get mass() { return this._mass; }
+  set mass(v) { this._mass = v; this.bodyLen = 6 + v * 0.55; }
+
   radius() {
     const r = 10 + Math.min(20, Math.sqrt(Math.max(0, this.mass - 8)) * 0.9);
     return this.power.giant > 0 ? r * 1.3 : r;
@@ -70,7 +76,7 @@ export class Snake {
   /** 0 when tiny, 1 when huge — how far along the snake is in growing. */
   growth() { return clamp(Math.sqrt(Math.max(0, this.mass - 8)) * 0.045, 0, 1); }
 
-  segTarget() { return clamp(Math.round(6 + this.mass * 0.55), 6, 220); }
+  segTarget() { return clamp(Math.round(this.bodyLen), 3, 220); }
 
   get size() { return Math.floor(this.mass); }
 
@@ -79,7 +85,8 @@ export class Snake {
 
   grow(v) {
     const g = v * (this.power.double > 0 ? 2 : 1);
-    this.mass += g;
+    this._mass += g;
+    this.bodyLen = Math.min(220, this.bodyLen + g * 0.55);
     if (this.mass > this.maxMass) this.maxMass = this.mass;
     this.mouth = 1;
     return g;
@@ -103,7 +110,8 @@ export class Snake {
       this.boostNow = true;
       if (this.power.turbo <= 0) {
         const drain = BOOST_DRAIN * dt;
-        this.mass -= drain;
+        this._mass -= drain;
+        this.bodyLen = Math.max(3, this.bodyLen - drain * 0.55);
         this.dropAcc += drain;
         if (this.dropAcc > 0.9) {
           const tail = this.segs[this.segs.length - 1];
