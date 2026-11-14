@@ -365,7 +365,7 @@ const FIELDS = [
   { key: 'arenaSize', label: 'Arena size', type: 'select', options: { small: 'Small', medium: 'Medium', large: 'Large' } },
   { key: 'pelletDensity', label: 'Amount of food', type: 'select', options: { low: 'Less', normal: 'Normal', high: 'Lots' } },
   { key: 'bounce', label: 'Bounce off bigger snakes when you crash into them (instead of being eaten)', type: 'check' },
-  { key: 'gentle', label: "Can't be eaten — if a big snake bites you down to nothing, you pop back in smaller (gentle mode)", type: 'check' },
+  { key: 'gentle', label: "Can't be eaten — big snakes only knock off tail pieces and you keep your size (gentle mode)", type: 'check' },
   { h: 'Player' },
   { key: 'startLength', label: 'Starting size', type: 'range', min: 5, max: 60, step: 1 },
   { key: 'playerSpeed', label: 'Player speed', type: 'range', min: 0.7, max: 1.3, step: 0.05, fmt: (v) => '×' + (+v).toFixed(2) },

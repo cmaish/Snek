@@ -622,15 +622,16 @@ export class Game {
     const n = B.segs.length;
     const cut = Math.max(3, j);
     const keepMass = B.mass * (cut / n);
-    if (keepMass < 5 || (B.isPlayer && this.settings.gentle ? false : cut <= 3)) {
+    const keepSize = B.isPlayer && this.settings.gentle; // tail drops off but the player keeps their size
+    if (!keepSize && (keepMass < 5 || cut <= 3)) {
       this.kill(B, A);
       return;
     }
     const lost = B.mass - keepMass;
-    B.mass = keepMass;
-    const removed = B.segs.splice(cut);
+    if (!keepSize) B.mass = keepMass;
+    const removed = B.segs.splice(cut); // (a kept-size tail grows back as it moves)
     const at = removed[0];
-    this.spawnRemains(removed, B, lost * 0.85, A, 0.6);
+    this.spawnRemains(removed, B, lost * (keepSize ? 0.5 : 0.85), A, 0.6);
     A.biteCd = 0.35;
     A.mouth = 1;
     B.hurt = 0.4;
@@ -834,11 +835,11 @@ export class Game {
     let tx, ty, tz;
     if (P && P.alive) {
       // look a little ahead of where you're going — helps on small screens
-      const look = 70 * (P.boostNow ? 1.5 : 1);
+      const look = (70 + P.growth() * 110) * (P.boostNow ? 1.4 : 1);
       c.lx += (Math.cos(P.angle) * look - c.lx) * Math.min(1, dt * 2.5);
       c.ly += (Math.sin(P.angle) * look - c.ly) * Math.min(1, dt * 2.5);
       tx = P.head.x + c.lx; ty = P.head.y + c.ly;
-      tz = 1 / (1 + Math.max(0, P.radius() - 10) * 0.045);
+      tz = 1 / (1 + P.growth() * 1.3 + (P.power.giant > 0 ? 0.15 : 0));
       if (P.boostNow) tz *= 0.93;
       if (this.countdown > 0) tz *= 1 + this.countdown * 0.12;
     } else if (P && this.deathPos) {

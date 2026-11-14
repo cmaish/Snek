@@ -67,6 +67,9 @@ export class Snake {
   /** Size used when two snakes clash (the giant power-up counts extra). */
   clashMass() { return this.power.giant > 0 ? this.mass * 1.5 : this.mass; }
 
+  /** 0 when tiny, 1 when huge — how far along the snake is in growing. */
+  growth() { return clamp(Math.sqrt(Math.max(0, this.mass - 8)) * 0.045, 0, 1); }
+
   segTarget() { return clamp(Math.round(6 + this.mass * 0.55), 6, 220); }
 
   get size() { return Math.floor(this.mass); }
@@ -86,11 +89,11 @@ export class Snake {
     const r = this.radius();
     this.frozen = game.freezeT > 0 && game.freezer !== this && this.power.shield <= 0;
     // Steering: bigger snakes turn a little slower.
-    const turn = (6.2 / (1 + (r - 10) * 0.035)) * (this.frozen ? 0.6 : 1) * dt;
+    const turn = (6.2 / (1 + (r - 10) * 0.018)) * (this.frozen ? 0.6 : 1) * dt;
     const d = angleDiff(this.targetAngle, this.angle);
     this.angle += d > turn ? turn : d < -turn ? -turn : d;
 
-    let sp = BASE_SPEED * this.speedMul;
+    let sp = BASE_SPEED * this.speedMul * (1 + this.growth() * (this.isPlayer ? 0.45 : 0.2));
     this.boostNow = false;
     if (this.power.speed > 0) {
       sp *= 1.5;
