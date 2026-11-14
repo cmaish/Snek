@@ -266,9 +266,9 @@ export class Game {
     const base = S.startLength;
     let len;
     if (P && !initial) {
-      len = Math.random() < 0.6 ? rand(base, Math.max(base + 6, P.mass * 0.8)) : rand(P.mass * 0.9, P.mass * 1.5 + 10);
+      len = Math.random() < 0.72 ? rand(base, Math.max(base + 6, P.mass * 0.75)) : rand(P.mass * 0.85, P.mass * 1.25 + 8);
     } else {
-      len = base + Math.pow(Math.random(), 2) * (S.difficulty === 'hard' ? 90 : S.difficulty === 'easy' ? 35 : 60);
+      len = base + Math.pow(Math.random(), 2.5) * (S.difficulty === 'hard' ? 70 : S.difficulty === 'easy' ? 25 : 40);
     }
     const b = new Snake({
       name, skin: pick(this.botSkins), x, y, angle: rand(TAU),
@@ -525,7 +525,8 @@ export class Game {
         if (B === A || !B.alive || B.ghost > 0) continue;
         const bb = B.bbox;
         if (h.x < bb.x0 - hr || h.x > bb.x1 + hr || h.y < bb.y0 - hr || h.y > bb.y1 + hr) continue;
-        const rr = (hr + B.radius()) * 0.85, rr2 = rr * rr, segs = B.segs;
+        // the player gets a smaller hitbox so near-misses don't count
+        const rr = (hr + B.radius()) * (A.isPlayer || B.isPlayer ? 0.7 : 0.85), rr2 = rr * rr, segs = B.segs;
         for (let j = 0; j < segs.length; j++) {
           const s = segs[j], dx = h.x - s.x, dy = h.y - s.y;
           if (dx * dx + dy * dy < rr2) {

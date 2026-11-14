@@ -3,7 +3,7 @@ import { prepSkin, segSprite, drawFace, drawHat, glowSprite, ballSprite, taper }
 import { drawCharHead, headTop } from './heads.js';
 
 let NEXT_ID = 1;
-export const BASE_SPEED = 170;
+export const BASE_SPEED = 140;
 const SPACING = 0.5;     // segment spacing as a fraction of radius
 const MIN_BOOST = 8;     // can't boost below this length
 const BOOST_DRAIN = 2.2; // length lost per second while boosting
@@ -92,10 +92,10 @@ export class Snake {
     let sp = BASE_SPEED * this.speedMul;
     this.boostNow = false;
     if (this.power.speed > 0) {
-      sp *= 1.65;
+      sp *= 1.5;
       this.boostNow = true;
     } else if (this.boosting && (this.mass > MIN_BOOST || this.power.turbo > 0)) {
-      sp *= 1.75;
+      sp *= 1.6;
       this.boostNow = true;
       if (this.power.turbo <= 0) {
         const drain = BOOST_DRAIN * dt;

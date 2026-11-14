@@ -16,7 +16,7 @@ const ADMIN_KEY = 'snek.admin.v1';
 const DEFAULT_PIN = '1234';
 
 export const DEFAULT_SETTINGS = {
-  botCount: 10,
+  botCount: 8,
   difficulty: 'normal',
   botsChasePlayer: true,
   gentle: false,
@@ -26,7 +26,7 @@ export const DEFAULT_SETTINGS = {
   pelletDensity: 'normal',
   playerSpeed: 1,
   boostEnabled: true,
-  spawnShield: 3,
+  spawnShield: 5,
   coinMultiplier: 1,
   showNames: true,
   powerups: { magnet: true, speed: true, shield: true, double: true, freeze: true, feast: true, giant: true },

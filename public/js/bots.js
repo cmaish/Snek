@@ -3,9 +3,9 @@
 import { rand, TAU } from './util.js';
 
 export const DIFFICULTY = {
-  easy: { react: 0.36, aggr: 0.2, avoid: 0.8, boost: 0.15, speed: 0.9 },
-  normal: { react: 0.22, aggr: 0.5, avoid: 1.0, boost: 0.4, speed: 1.0 },
-  hard: { react: 0.12, aggr: 0.85, avoid: 1.25, boost: 0.7, speed: 1.05 },
+  easy: { react: 0.45, aggr: 0.08, avoid: 0.75, boost: 0.08, speed: 0.85, chase: 0.15 },
+  normal: { react: 0.32, aggr: 0.25, avoid: 0.9, boost: 0.2, speed: 0.92, chase: 0.25 },
+  hard: { react: 0.18, aggr: 0.6, avoid: 1.15, boost: 0.5, speed: 1.0, chase: 0.5 },
 };
 
 export function newBrain() {
@@ -35,12 +35,12 @@ export function updateBot(b, game, dt) {
   const danger = (90 + r * 4) * D.avoid;
   const lx = h.x + Math.cos(b.angle) * r * 2, ly = h.y + Math.sin(b.angle) * r * 2;
   let prey = null, preyD = Infinity;
-  const huntR = 320 + r * 10;
+  const huntR = 260 + r * 8;
   for (const o of game.snakes) {
     if (o === b || !o.alive || o.ghost > 0) continue;
     if (canBeat(b, o)) {
       // give a fresh player a grace period, and hunt them a bit less eagerly
-      if (o.isPlayer && (!game.settings.botsChasePlayer || game.time < 15 || Math.random() > 0.7)) continue;
+      if (o.isPlayer && (!game.settings.botsChasePlayer || game.time < 25 || Math.random() > D.chase)) continue;
       const oh = o.segs[0];
       const d = Math.hypot(oh.x - h.x, oh.y - h.y);
       if (d < huntR && d < preyD) { preyD = d; prey = o; }
