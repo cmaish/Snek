@@ -7,7 +7,7 @@ It's a Progressive Web App made of plain static files (HTML/CSS/JS, no build ste
 
 - Steer by dragging anywhere on the screen (floating joystick), pointing the mouse, or arrow keys / WASD.
 - Eat glowing dots to grow (⭐ stars are worth extra). Every snake wears a number badge with its size.
-- **Bigger snakes eat smaller ones.** Bump into a smaller snake's body to chomp off its tail; hit it head-on to swallow it whole. Crash into a bigger snake and you just bounce off (BOING!), but bigger snakes can still bite your tail, and a tiny snake can get eaten. Badges are **green** when you can eat that snake and **red** when it can eat you, and the screen edges glow red when a bigger snake is close.
+- **Bigger snakes eat smaller ones.** Bump into a smaller snake's body to chomp off its tail; hit it head-on to swallow it whole. Crash into a bigger snake and you just bounce off (BOING!). Bigger snakes can still bite your tail; by default you can't be eaten, and if you're bitten down to nothing you pop back in somewhere safe, smaller (PHEW!). Badges are **green** when you can eat that snake and **red** when it can eat you, and the screen edges glow red when a bigger snake is close.
 - Hold **BOOST** (button, second finger, mouse button or space) to zoom; it costs a little size.
 - Eat snakes quickly for combos (DOUBLE GULP!, TRIPLE GULP!…). Size milestones, kill feed, countdown, haptics, confetti and star ratings keep it lively.
 - Matches last 3 minutes by default. Finish as the biggest snake for bonus coins. Coins buy body skins (19, with patterns, eyes and hats), **character heads** and boosters.
@@ -30,7 +30,7 @@ Tap the faint 🔒 in the bottom-right corner of the home screen (or open `…/#
 | --- | --- |
 | 🐶 Heads | Set each head's price (0 = free) or hide it; make every head free in one tap. |
 | 🎨 Skins | Create, edit, duplicate, reorder, hide or delete skins. Set colours, pattern, eyes, hat, price, "free for everyone", and whether bots can wear it. Live preview. |
-| 🎮 Game rules | Number of bots, difficulty, whether bots hunt the player, bounce off bigger snakes (on by default), gentle mode (lose length instead of being eaten), match length, arena size, food amount, starting size, speed, spawn protection, boost on/off, names on/off, coin multiplier, which power-ups appear, booster prices (or turn boosters off), daily gift size. |
+| 🎮 Game rules | Number of bots, difficulty, whether bots hunt the player, bounce off bigger snakes (on by default), can't-be-eaten gentle mode (on by default; turn off for a real challenge), match length, arena size, food amount, starting size, speed, spawn protection, boost on/off, names on/off, coin multiplier, which power-ups appear, booster prices (or turn boosters off), daily gift size. |
 | 🪙 Player progress | Set/add coins, unlock or re-lock skins, reset best score or all progress. |
 | 💾 Backup | Export skins, head prices + rules as `config.json`, or import one. |
 | 🔑 PIN | Change the PIN. |

@@ -17,9 +17,9 @@ const DEFAULT_PIN = '1234';
 
 export const DEFAULT_SETTINGS = {
   botCount: 8,
-  difficulty: 'normal',
+  difficulty: 'easy',
   botsChasePlayer: true,
-  gentle: false,
+  gentle: true,
   bounce: true,
   matchSeconds: 180,
   arenaSize: 'medium',

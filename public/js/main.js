@@ -273,7 +273,7 @@ function openReady() {
   tap();
   const S = getSettings();
   if (!S.boostersEnabled) { startGame([]); return; }
-  picked = new Set([...picked].filter((k) => S.boosterPrices[k] <= progress.coins));
+  picked = new Set([...picked].filter((k) => S.boosterPrices[k] <= progress.coins && !(k === 'life' && S.gentle)));
   renderBoosters();
   show('ready');
 }
@@ -286,7 +286,9 @@ function boosterCost() {
 function renderBoosters() {
   const P = getSettings().boosterPrices;
   const grid = $('#booster-grid');
-  grid.innerHTML = Object.entries(BOOSTERS).map(([k, b]) => `
+  // Extra Life is pointless when you can't be eaten anyway
+  const list = Object.entries(BOOSTERS).filter(([k]) => !(k === 'life' && getSettings().gentle));
+  grid.innerHTML = list.map(([k, b]) => `
     <button class="booster ${picked.has(k) ? 'on' : ''}" data-k="${k}">
       <span class="b-ico">${b.icon}</span>
       <b>${b.name}</b>

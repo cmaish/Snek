@@ -266,9 +266,10 @@ export class Game {
     const base = S.startLength;
     let len;
     if (P && !initial) {
-      len = Math.random() < 0.72 ? rand(base, Math.max(base + 6, P.mass * 0.75)) : rand(P.mass * 0.85, P.mass * 1.25 + 8);
+      const small = S.difficulty === 'easy' ? 0.85 : S.difficulty === 'hard' ? 0.6 : 0.75;
+      len = Math.random() < small ? rand(base, Math.max(base + 6, P.mass * 0.7)) : rand(P.mass * 0.85, P.mass * 1.2 + 6);
     } else {
-      len = base + Math.pow(Math.random(), 2.5) * (S.difficulty === 'hard' ? 70 : S.difficulty === 'easy' ? 25 : 40);
+      len = base + Math.pow(Math.random(), 2.5) * (S.difficulty === 'hard' ? 70 : S.difficulty === 'easy' ? 15 : 30);
     }
     const b = new Snake({
       name, skin: pick(this.botSkins), x, y, angle: rand(TAU),
@@ -397,7 +398,7 @@ export class Game {
     for (const s of snakes) {
       const r = s.radius();
       s._r = r;
-      s._eat = s.power.magnet > 0 ? 260 + r * 4 : r * 2.3 + 16;
+      s._eat = s.power.magnet > 0 ? 260 + r * 4 : s.isPlayer ? r * 3 + 26 : r * 2.3 + 16;
     }
     const pellets = this.pellets;
     const fr = Math.pow(0.04, dt);
@@ -414,7 +415,7 @@ export class Game {
         const step = (300 + p.t * 2200) * dt;
         if (d < s._r * 0.8 || step >= d || p.t > 1.1) {
           p.dead = true;
-          const gained = s.grow(p.v);
+          const gained = s.grow(s === P ? p.v * 1.3 : p.v);
           if (s === P) {
             sfx.pop();
             if (p.v >= 2) this.floatText(h.x, h.y - s._r * 2, '+' + Math.round(gained), '#fff6a0', 16);
@@ -526,7 +527,7 @@ export class Game {
         const bb = B.bbox;
         if (h.x < bb.x0 - hr || h.x > bb.x1 + hr || h.y < bb.y0 - hr || h.y > bb.y1 + hr) continue;
         // the player gets a smaller hitbox so near-misses don't count
-        const rr = (hr + B.radius()) * (A.isPlayer || B.isPlayer ? 0.7 : 0.85), rr2 = rr * rr, segs = B.segs;
+        const rr = (hr + B.radius()) * (A.isPlayer ? 1.0 : B.isPlayer ? 0.65 : 0.85), rr2 = rr * rr, segs = B.segs;
         for (let j = 0; j < segs.length; j++) {
           const s = segs[j], dx = h.x - s.x, dy = h.y - s.y;
           if (dx * dx + dy * dy < rr2) {
@@ -661,8 +662,8 @@ export class Game {
       killer.kills++;
       killer.mouth = 1;
     }
-    if (victim.isPlayer && this.lives > 0 && !this.over) {
-      this.revivePlayer(killer);
+    if (victim.isPlayer && !this.over && (this.lives > 0 || this.settings.gentle)) {
+      this.revivePlayer(killer, this.lives <= 0);
       return;
     }
     victim.alive = false;
@@ -692,11 +693,11 @@ export class Game {
     }
   }
 
-  /** Extra Life booster: come back somewhere safe with half your size. */
-  revivePlayer(killer) {
+  /** Extra Life booster or gentle mode: come back somewhere safe, smaller. */
+  revivePlayer(killer, gentle) {
     const P = this.player;
-    this.lives--;
-    const lost = P.mass * 0.5;
+    if (!gentle) this.lives--;
+    const lost = P.mass * (gentle ? 0.4 : 0.5);
     this.spawnRemains(P.segs, P, lost * 0.85, killer, killer ? 0.45 : 0);
     P.mass = Math.max(this.settings.startLength, P.mass - lost);
     for (const k in P.power) P.power[k] = 0;
@@ -708,7 +709,8 @@ export class Game {
     this.haptic([40, 40, 40]);
     this.flash = 0.4;
     this.shake = 12;
-    this.showBanner('❤️ EXTRA LIFE!', '#ff6b9a', 'Back in the game!');
+    if (gentle) this.showBanner('PHEW! 🫧', '#9be7ff', 'You shrank, keep going!');
+    else this.showBanner('❤️ EXTRA LIFE!', '#ff6b9a', 'Back in the game!');
   }
 
   endMatch(reason, killer) {

@@ -3,8 +3,8 @@
 import { rand, TAU } from './util.js';
 
 export const DIFFICULTY = {
-  easy: { react: 0.45, aggr: 0.08, avoid: 0.75, boost: 0.08, speed: 0.85, chase: 0.15 },
-  normal: { react: 0.32, aggr: 0.25, avoid: 0.9, boost: 0.2, speed: 0.92, chase: 0.25 },
+  easy: { react: 0.5, aggr: 0.05, avoid: 0.75, boost: 0.04, speed: 0.8, chase: 0.06 },
+  normal: { react: 0.32, aggr: 0.2, avoid: 0.9, boost: 0.15, speed: 0.88, chase: 0.15 },
   hard: { react: 0.18, aggr: 0.6, avoid: 1.15, boost: 0.5, speed: 1.0, chase: 0.5 },
 };
 
