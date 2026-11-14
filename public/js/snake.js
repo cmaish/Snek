@@ -1,11 +1,12 @@
 import { TAU, clamp, angleDiff, rand, hslHex } from './util.js';
-import { prepSkin, segSprite, drawFace, glowSprite } from './render.js';
+import { prepSkin, segSprite, drawFace, glowSprite, ballSprite, taper } from './render.js';
 
 let NEXT_ID = 1;
 export const BASE_SPEED = 170;
 const SPACING = 0.5;     // segment spacing as a fraction of radius
 const MIN_BOOST = 8;     // can't boost below this length
 const BOOST_DRAIN = 2.2; // length lost per second while boosting
+const ICE = '#cdf3ff';
 
 export class Snake {
   constructor(o) {
@@ -20,8 +21,9 @@ export class Snake {
     this.alive = true;
     this.boosting = false;
     this.boostNow = false;
+    this.frozen = false;
     this.kills = 0;
-    this.power = { magnet: 0, speed: 0, shield: 0, double: 0 };
+    this.power = { magnet: 0, speed: 0, shield: 0, double: 0, giant: 0, freeze: 0, turbo: 0 };
     this.ghost = o.ghost || 0; // spawn protection: can't hurt or be hurt
     this.mouth = 0;
     this.biteCd = 0;
@@ -31,14 +33,19 @@ export class Snake {
     this.tongueIn = rand(2, 6);
     this.hurt = 0;
     this.dropAcc = 0;
+    this.trailAcc = 0;
     this.speedMul = o.speedMul || 1;
     this.ai = null;
     this.bbox = { x0: 0, y0: 0, x1: 0, y1: 0 };
-    const r = this.radius(), sp = r * SPACING, n = this.segTarget();
+    this.placeAt(o.x, o.y, this.angle);
+  }
+
+  /** (Re)builds the body as a straight line ending at (x,y). */
+  placeAt(x, y, angle) {
+    this.angle = this.targetAngle = angle;
+    const sp = this.radius() * SPACING, n = this.segTarget();
     this.segs = [];
-    for (let i = 0; i < n; i++) {
-      this.segs.push({ x: o.x - Math.cos(this.angle) * i * sp, y: o.y - Math.sin(this.angle) * i * sp });
-    }
+    for (let i = 0; i < n; i++) this.segs.push({ x: x - Math.cos(angle) * i * sp, y: y - Math.sin(angle) * i * sp });
     this.calcBBox();
   }
 
@@ -49,7 +56,13 @@ export class Snake {
 
   get head() { return this.segs[0]; }
 
-  radius() { return 10 + Math.min(20, Math.sqrt(Math.max(0, this.mass - 8)) * 0.9); }
+  radius() {
+    const r = 10 + Math.min(20, Math.sqrt(Math.max(0, this.mass - 8)) * 0.9);
+    return this.power.giant > 0 ? r * 1.3 : r;
+  }
+
+  /** Size used when two snakes clash (the giant power-up counts extra). */
+  clashMass() { return this.power.giant > 0 ? this.mass * 1.5 : this.mass; }
 
   segTarget() { return clamp(Math.round(6 + this.mass * 0.55), 6, 220); }
 
@@ -65,8 +78,9 @@ export class Snake {
 
   update(dt, game) {
     const r = this.radius();
+    this.frozen = game.freezeT > 0 && game.freezer !== this && this.power.shield <= 0;
     // Steering: bigger snakes turn a little slower.
-    const turn = (5.4 / (1 + (r - 10) * 0.035)) * dt;
+    const turn = (5.4 / (1 + (r - 10) * 0.035)) * (this.frozen ? 0.6 : 1) * dt;
     const d = angleDiff(this.targetAngle, this.angle);
     this.angle += d > turn ? turn : d < -turn ? -turn : d;
 
@@ -75,18 +89,21 @@ export class Snake {
     if (this.power.speed > 0) {
       sp *= 1.65;
       this.boostNow = true;
-    } else if (this.boosting && this.mass > MIN_BOOST) {
+    } else if (this.boosting && (this.mass > MIN_BOOST || this.power.turbo > 0)) {
       sp *= 1.75;
       this.boostNow = true;
-      const drain = BOOST_DRAIN * dt;
-      this.mass -= drain;
-      this.dropAcc += drain;
-      if (this.dropAcc > 0.9) {
-        const tail = this.segs[this.segs.length - 1];
-        game.dropPellet(tail.x, tail.y, this.dropAcc * 0.7, this);
-        this.dropAcc = 0;
+      if (this.power.turbo <= 0) {
+        const drain = BOOST_DRAIN * dt;
+        this.mass -= drain;
+        this.dropAcc += drain;
+        if (this.dropAcc > 0.9) {
+          const tail = this.segs[this.segs.length - 1];
+          game.dropPellet(tail.x, tail.y, this.dropAcc * 0.7, this);
+          this.dropAcc = 0;
+        }
       }
     }
+    if (this.frozen) sp *= 0.45;
 
     const h = this.segs[0];
     h.x += Math.cos(this.angle) * sp * dt;
@@ -94,7 +111,8 @@ export class Snake {
 
     // Soft arena wall: slide along it and get nudged back inside.
     const dist = Math.hypot(h.x, h.y), lim = game.R - r;
-    if (dist > lim) {
+    this.atWall = dist > lim;
+    if (this.atWall) {
       h.x *= lim / dist;
       h.y *= lim / dist;
       const inward = Math.atan2(-h.y, -h.x);
@@ -120,6 +138,16 @@ export class Snake {
     }
     if (segs.length > tgt) segs.length = tgt;
 
+    // sparkly trail while zooming
+    if (this.boostNow) {
+      this.trailAcc += dt;
+      if (this.trailAcc > 0.05) {
+        this.trailAcc = 0;
+        const tail = segs[segs.length - 1];
+        game.trail(tail.x, tail.y, this.power.shield > 0 ? hslHex(rand(360), 100, 70) : this.prep.main, r);
+      }
+    }
+
     for (const k in this.power) if (this.power[k] > 0) this.power[k] -= dt;
     if (this.ghost > 0) this.ghost -= dt;
     this.mouth = Math.max(0, this.mouth - dt * 4);
@@ -142,7 +170,7 @@ export class Snake {
       if (s.y < y0) y0 = s.y;
       if (s.y > y1) y1 = s.y;
     }
-    const r = this.radius() * 1.2;
+    const r = this.radius() * 1.25;
     const b = this.bbox;
     b.x0 = x0 - r; b.y0 = y0 - r; b.x1 = x1 + r; b.y1 = y1 + r;
   }
@@ -150,33 +178,34 @@ export class Snake {
   draw(g, t, view) {
     const bb = this.bbox;
     if (bb.x1 < view.x0 || bb.x0 > view.x1 || bb.y1 < view.y0 || bb.y0 > view.y1) return;
-    const r = this.radius(), hr = r * 1.18, segs = this.segs, n = segs.length, p = this.prep;
+    const r = this.radius(), hr = r * 1.24, segs = this.segs, n = segs.length, p = this.prep;
     const vx0 = view.x0 - r, vx1 = view.x1 + r, vy0 = view.y0 - r, vy1 = view.y1 + r;
     g.save();
-    if (this.ghost > 0) g.globalAlpha = 0.45 + 0.25 * Math.sin(t * 18);
+    if (this.ghost > 0) g.globalAlpha = 0.5 + 0.25 * Math.sin(t * 18);
     else if (this.hurt > 0) g.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(t * 30));
 
-    // shadow (one path, cheap)
-    const off = r * 0.4;
-    g.fillStyle = 'rgba(8,4,40,0.28)';
+    // soft shadow (one path, cheap)
+    const off = r * 0.45;
+    g.fillStyle = 'rgba(8,4,40,0.3)';
     g.beginPath();
     for (let i = n - 1; i >= 0; i -= 2) {
       const s = segs[i];
       if (s.x < vx0 || s.x > vx1 || s.y < vy0 || s.y > vy1) continue;
-      g.moveTo(s.x + off * 0.3 + r, s.y + off);
-      g.arc(s.x + off * 0.3, s.y + off, r, 0, TAU);
+      const ri = (i === 0 ? hr : r * taper(i, n));
+      g.moveTo(s.x + off * 0.3 + ri, s.y + off);
+      g.arc(s.x + off * 0.3, s.y + off, ri, 0, TAU);
     }
     g.fill();
 
-    // speed / star glow
-    if (this.boostNow || this.power.shield > 0) {
-      const col = this.power.shield > 0 ? hslHex((t * 300) % 360, 100, 65) : p.main;
+    // glow for zoom / super star / giant
+    if (this.boostNow || this.power.shield > 0 || this.power.giant > 0) {
+      const col = this.power.shield > 0 ? hslHex((t * 300) % 360, 100, 65) : this.power.giant > 0 ? '#ff7b54' : p.main;
       const gl = glowSprite(col);
       const prev = g.globalCompositeOperation;
       g.globalCompositeOperation = 'lighter';
       for (let i = 0; i < n; i += 3) {
-        const s = segs[i];
-        g.drawImage(gl, s.x - r * 2.2, s.y - r * 2.2, r * 4.4, r * 4.4);
+        const s = segs[i], ri = r * taper(i, n) * 2.2;
+        g.drawImage(gl, s.x - ri, s.y - ri, ri * 2, ri * 2);
       }
       g.globalCompositeOperation = prev;
     }
@@ -184,28 +213,53 @@ export class Snake {
     for (let i = n - 1; i >= 1; i--) {
       const s = segs[i];
       if (s.x < vx0 || s.x > vx1 || s.y < vy0 || s.y > vy1) continue;
-      g.drawImage(segSprite(p, i, n, t), s.x - r, s.y - r, r * 2, r * 2);
+      const ri = r * taper(i, n);
+      g.drawImage(segSprite(p, i, n, t), s.x - ri, s.y - ri, ri * 2, ri * 2);
+    }
+    if (this.frozen) {
+      g.globalAlpha *= 0.55;
+      const ice = ballSprite(ICE);
+      for (let i = n - 1; i >= 1; i -= 2) {
+        const s = segs[i], ri = r * taper(i, n);
+        g.drawImage(ice, s.x - ri, s.y - ri, ri * 2, ri * 2);
+      }
+      g.globalAlpha /= 0.55;
     }
 
     const h = segs[0];
     if (this.power.shield > 0) {
       g.strokeStyle = hslHex((t * 400) % 360, 100, 70);
-      g.lineWidth = 4;
+      g.lineWidth = 5;
       g.beginPath();
       g.arc(h.x, h.y, hr * 1.55 + Math.sin(t * 12) * 3, 0, TAU);
       g.stroke();
     }
     if (this.power.magnet > 0) {
-      g.strokeStyle = 'rgba(255,79,109,0.45)';
+      g.strokeStyle = 'rgba(255,79,109,0.5)';
       g.lineWidth = 3;
       g.setLineDash([8, 10]);
       g.lineDashOffset = -t * 40;
       g.beginPath();
-      g.arc(h.x, h.y, hr * 3, 0, TAU);
+      g.arc(h.x, h.y, hr * 3 + Math.sin(t * 6) * 4, 0, TAU);
       g.stroke();
       g.setLineDash([]);
     }
+    if (this.ghost > 0 && this.ghost < 100) {
+      // bubble shield
+      g.fillStyle = 'rgba(160,220,255,0.18)';
+      g.strokeStyle = 'rgba(200,240,255,0.8)';
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(h.x, h.y, hr * 1.9, 0, TAU);
+      g.fill();
+      g.stroke();
+    }
     g.drawImage(segSprite(p, 0, n, t), h.x - hr, h.y - hr, hr * 2, hr * 2);
+    if (this.frozen) {
+      g.globalAlpha *= 0.55;
+      g.drawImage(ballSprite(ICE), h.x - hr, h.y - hr, hr * 2, hr * 2);
+      g.globalAlpha /= 0.55;
+    }
     drawFace(g, h.x, h.y, hr, this.angle, this.skin, {
       t, mouth: this.mouth, blink: this.blink, tongue: this.tongue > 0 && this.mouth < 0.1, look: this.targetAngle,
     });

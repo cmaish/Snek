@@ -13,6 +13,11 @@ const DEFAULTS = {
   sound: true,
   music: true,
   tipsShown: 0,
+  haptics: true,
+  boostLeft: false,
+  lastGift: '',
+  giftStreak: 0,
+  bestStreak: 0,
 };
 
 function load() {

@@ -10,6 +10,7 @@ import { progress, saveProgress, resetProgress } from './storage.js';
 import { PATTERNS, EYES, HATS, sanitizeSkin, slugify } from './skins.js';
 import { drawSnakePreview } from './render.js';
 import { sfx } from './audio.js';
+import { BOOSTERS } from './boosters.js';
 import { esc, pick, randInt, hslHex } from './util.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -311,6 +312,17 @@ const FIELDS = [
   { key: 'powerups.speed', label: '⚡ Speed', type: 'check' },
   { key: 'powerups.shield', label: '⭐ Super Star (invincible)', type: 'check' },
   { key: 'powerups.double', label: '2× Double growth', type: 'check' },
+  { key: 'powerups.freeze', label: '❄️ Freeze (slows everyone else)', type: 'check' },
+  { key: 'powerups.feast', label: '🍰 Candy rain (instant food)', type: 'check' },
+  { key: 'powerups.giant', label: '🍄 Giant (fights as if 50% bigger)', type: 'check' },
+  { h: 'Boosters (bought before a match)' },
+  { key: 'boostersEnabled', label: 'Show the booster screen before matches', type: 'check' },
+  ...Object.entries(BOOSTERS).map(([k, b]) => ({
+    key: 'boosterPrices.' + k, label: `${b.icon} ${b.name} price`, type: 'range', min: 0, max: 300, step: 5,
+    fmt: (v) => (+v ? '🪙 ' + v : 'free'),
+  })),
+  { h: 'Daily gift' },
+  { key: 'dailyGift', label: 'Coins in the daily gift (grows with a daily streak)', type: 'range', min: 0, max: 300, step: 10, fmt: (v) => (+v ? '🪙 ' + v : 'off') },
 ];
 
 function getPath(o, k) { return k.split('.').reduce((a, p) => a?.[p], o); }

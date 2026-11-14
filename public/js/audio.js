@@ -111,6 +111,41 @@ export const sfx = {
   win() {
     [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone({ f, dur: 0.16, type: 'triangle', vol: 0.18, when: i * 0.1 }));
   },
+  beep() {
+    tone({ f: 660, dur: 0.14, type: 'square', vol: 0.09 });
+  },
+  go() {
+    tone({ f: 880, dur: 0.1, type: 'square', vol: 0.09 });
+    tone({ f: 1320, dur: 0.3, type: 'square', vol: 0.09, when: 0.08 });
+  },
+  levelup() {
+    [523, 784, 1047, 1568].forEach((f, i) => tone({ f, dur: 0.18, type: 'triangle', vol: 0.2, when: i * 0.07 }));
+  },
+  streak(n) {
+    const base = 440 * Math.pow(1.12, Math.min(n, 6));
+    [1, 1.25, 1.5, 2].forEach((m, i) => tone({ f: base * m, dur: 0.12, type: 'square', vol: 0.07, when: i * 0.05 }));
+  },
+  freeze() {
+    [2093, 1760, 1568, 1319, 1047].forEach((f, i) => tone({ f, dur: 0.15, type: 'sine', vol: 0.12, when: i * 0.05 }));
+    noise({ dur: 0.4, vol: 0.08, freq: 6000 });
+  },
+  feast() {
+    for (let i = 0; i < 8; i++) tone({ f: 600 + Math.random() * 900, dur: 0.06, vol: 0.08, when: i * 0.05 });
+  },
+  giant() {
+    tone({ f: 110, f2: 330, dur: 0.45, type: 'sawtooth', vol: 0.12 });
+    tone({ f: 220, f2: 660, dur: 0.45, type: 'triangle', vol: 0.15 });
+  },
+  life() {
+    [392, 523, 659, 784, 1047].forEach((f, i) => tone({ f, dur: 0.2, type: 'triangle', vol: 0.18, when: i * 0.08 }));
+  },
+  gift() {
+    [784, 988, 1175, 1568, 1976].forEach((f, i) => tone({ f, dur: 0.18, type: 'triangle', vol: 0.16, when: i * 0.09 }));
+    noise({ dur: 0.3, vol: 0.1, freq: 7000, when: 0.4 });
+  },
+  whoosh() {
+    noise({ dur: 0.25, vol: 0.12, freq: 1200 });
+  },
   error() {
     tone({ f: 200, f2: 150, dur: 0.18, type: 'square', vol: 0.08 });
   },

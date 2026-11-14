@@ -28,7 +28,10 @@ export const DEFAULT_SETTINGS = {
   spawnShield: 3,
   coinMultiplier: 1,
   showNames: true,
-  powerups: { magnet: true, speed: true, shield: true, double: true },
+  powerups: { magnet: true, speed: true, shield: true, double: true, freeze: true, feast: true, giant: true },
+  boostersEnabled: true,
+  boosterPrices: { size: 40, shield: 25, magnet: 35, turbo: 35, life: 60, coins: 50 },
+  dailyGift: 50,
 };
 
 let server = {}; // contents of config.json
@@ -56,6 +59,7 @@ function sanitizeSettings(s) {
   const num = (v, lo, hi, def) => (Number.isFinite(Number(v)) && v !== '' && v !== null ? clamp(Number(v), lo, hi) : def);
   const bool = (v, def) => (typeof v === 'boolean' ? v : def);
   const pu = s.powerups && typeof s.powerups === 'object' ? s.powerups : {};
+  const bp = s.boosterPrices && typeof s.boosterPrices === 'object' ? s.boosterPrices : {};
   return {
     botCount: Math.round(num(s.botCount, 0, 30, d.botCount)),
     difficulty: pick(s.difficulty, ['easy', 'normal', 'hard'], d.difficulty),
@@ -70,25 +74,31 @@ function sanitizeSettings(s) {
     spawnShield: num(s.spawnShield, 0, 15, d.spawnShield),
     coinMultiplier: num(s.coinMultiplier, 0, 10, d.coinMultiplier),
     showNames: bool(s.showNames, d.showNames),
-    powerups: {
-      magnet: bool(pu.magnet, d.powerups.magnet),
-      speed: bool(pu.speed, d.powerups.speed),
-      shield: bool(pu.shield, d.powerups.shield),
-      double: bool(pu.double, d.powerups.double),
-    },
+    powerups: Object.fromEntries(Object.keys(d.powerups).map((k) => [k, bool(pu[k], d.powerups[k])])),
+    boostersEnabled: bool(s.boostersEnabled, d.boostersEnabled),
+    boosterPrices: Object.fromEntries(Object.keys(d.boosterPrices).map((k) => [k, Math.round(num(bp[k], 0, 100000, d.boosterPrices[k]))])),
+    dailyGift: Math.round(num(s.dailyGift, 0, 10000, d.dailyGift)),
   };
 }
 
 /** Settings from defaults + config.json, without this device's overrides. */
 function baseSettings() {
   const s = server.settings || {};
-  return sanitizeSettings({ ...DEFAULT_SETTINGS, ...s, powerups: { ...DEFAULT_SETTINGS.powerups, ...(s.powerups || {}) } });
+  return sanitizeSettings({
+    ...DEFAULT_SETTINGS, ...s,
+    powerups: { ...DEFAULT_SETTINGS.powerups, ...(s.powerups || {}) },
+    boosterPrices: { ...DEFAULT_SETTINGS.boosterPrices, ...(s.boosterPrices || {}) },
+  });
 }
 
 export function getSettings() {
   const b = baseSettings();
   const l = local.settings || {};
-  return sanitizeSettings({ ...b, ...l, powerups: { ...b.powerups, ...(l.powerups || {}) } });
+  return sanitizeSettings({
+    ...b, ...l,
+    powerups: { ...b.powerups, ...(l.powerups || {}) },
+    boosterPrices: { ...b.boosterPrices, ...(l.boosterPrices || {}) },
+  });
 }
 
 export function saveSettings(settings) {

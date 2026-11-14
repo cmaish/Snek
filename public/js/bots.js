@@ -15,7 +15,7 @@ export function newBrain() {
 function canBeat(b, o) {
   if (o.ghost > 0) return false;
   if (b.power.shield > 0) return o.power.shield <= 0;
-  return o.power.shield <= 0 && o.mass < b.mass * 0.92;
+  return o.power.shield <= 0 && o.clashMass() < b.clashMass() * 0.92;
 }
 
 export function updateBot(b, game, dt) {

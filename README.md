@@ -6,11 +6,19 @@ It's a Progressive Web App made of plain static files (HTML/CSS/JS, no build ste
 ## How it plays
 
 - Steer by dragging anywhere on the screen (floating joystick), pointing the mouse, or arrow keys / WASD.
-- Eat glowing dots to grow. The number above every snake is its size.
-- **Bigger snakes eat smaller ones.** Bump into a smaller snake's body to chomp off its tail; hit it head-on to swallow it whole. Touch a bigger snake and *you* get eaten. Numbers are green when you can eat that snake and red when it can eat you.
-- Hold **BOOST** (button, second finger, mouse button or space) to go fast; it costs a little size.
-- Power-ups: 🧲 magnet, ⚡ speed, ⭐ super star (invincible, eats anything), 2× double growth.
-- Matches last 3 minutes by default. Finish as the biggest snake for bonus coins. Coins buy skins in the shop (19 skins with patterns, eyes and hats).
+- Eat glowing dots to grow (⭐ stars are worth extra). Every snake wears a number badge with its size.
+- **Bigger snakes eat smaller ones.** Bump into a smaller snake's body to chomp off its tail; hit it head-on to swallow it whole. Touch a bigger snake and *you* get eaten. Badges are **green** when you can eat that snake and **red** when it can eat you, and the screen edges glow red when a bigger snake is close.
+- Hold **BOOST** (button, second finger, mouse button or space) to zoom; it costs a little size.
+- Eat snakes quickly for combos (DOUBLE GULP!, TRIPLE GULP!…). Size milestones, kill feed, countdown, haptics, confetti and star ratings keep it lively.
+- Matches last 3 minutes by default. Finish as the biggest snake for bonus coins. Coins buy skins (19 skins with patterns, eyes and hats) and boosters.
+
+**In-game power-ups** (bubbles in the arena; arrows at the screen edge point to nearby ones):
+🧲 Magnet · ⚡ Zoom · ⭐ Super Star (invincible, eats anyone) · 2× Double growth · ❄️ Freeze (slows everyone else) · 🍰 Candy Rain (a shower of food) · 🍄 Giant (fights as if 50% bigger)
+
+**Pre-game boosters** (bought with coins on the screen after PLAY):
+🍔 Big Start · 🫧 Bubble Shield · 🧲 Super Magnet · 🚀 Turbo Fuel (free boosting) · ❤️ Extra Life · 💰 Coin Rush (double coins)
+
+**Kid settings** (⚙️ on the home screen): sound, music, vibration, and boost button on the left for left-handers. There's also a 🎁 daily gift with a streak bonus.
 
 ## Grown-up settings (admin menu)
 
@@ -19,7 +27,7 @@ Tap the faint 🔒 in the bottom-right corner of the home screen (or open `…/#
 | Tab | What you can do |
 | --- | --- |
 | 🎨 Skins | Create, edit, duplicate, reorder, hide or delete skins. Set colours, pattern, eyes, hat, price, "free for everyone", and whether bots can wear it. Live preview. |
-| 🎮 Game rules | Number of bots, difficulty, whether bots hunt the player, gentle mode (lose length instead of being eaten), match length, arena size, food amount, starting size, speed, spawn protection, boost on/off, names on/off, coin multiplier, which power-ups appear. |
+| 🎮 Game rules | Number of bots, difficulty, whether bots hunt the player, gentle mode (lose length instead of being eaten), match length, arena size, food amount, starting size, speed, spawn protection, boost on/off, names on/off, coin multiplier, which power-ups appear, booster prices (or turn boosters off), daily gift size. |
 | 🪙 Player progress | Set/add coins, unlock or re-lock skins, reset best score or all progress. |
 | 💾 Backup | Export skins + rules as `config.json`, or import one. |
 | 🔑 PIN | Change the PIN. |
@@ -69,7 +77,8 @@ public/              ← upload this folder
   manifest.webmanifest, sw.js, config.json
   css/style.css
   js/
-    main.js     screens, HUD, shop, results
+    main.js     screens, HUD, shop, boosters, results
+    boosters.js pre-game booster list
     game.js     arena simulation + rendering
     snake.js    snake movement & drawing
     bots.js     bot AI

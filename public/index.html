@@ -13,6 +13,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Snek">
+  <meta name="format-detection" content="telephone=no">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -23,13 +24,15 @@
     <div class="hud-tl">
       <button id="btn-pause" class="icon-btn" aria-label="Pause">⏸</button>
       <div class="stat-pill big"><span>🐍</span><b id="hud-len">10</b></div>
-      <div class="stat-pill"><span>🏆</span><b id="hud-rank">#1</b><span>😋</span><b id="hud-kills">0</b></div>
+      <div class="stat-pill"><span>🏆</span><b id="hud-rank">#1</b><span class="sep">😋</span><b id="hud-kills">0</b></div>
+      <div id="hud-lives" class="stat-pill lives hidden">❤️</div>
     </div>
     <div id="hud-powers" class="powers"></div>
     <div id="hud-timer" class="hud-timer">3:00</div>
     <ol id="hud-board" class="board"></ol>
+    <div id="feed" class="feed"></div>
     <canvas id="minimap"></canvas>
-    <button id="btn-boost" class="boost-btn" aria-label="Boost">⚡<span>BOOST</span></button>
+    <button id="btn-boost" class="boost-btn" aria-label="Boost"><span class="bolt">⚡</span><span>BOOST</span></button>
     <div id="toasts" class="toasts"></div>
   </div>
   <div id="joystick" class="joystick hidden"><div class="knob"></div></div>
@@ -37,28 +40,46 @@
   <!-- Home -->
   <section id="screen-home" class="screen home">
     <div class="home-top">
-      <div class="coins"><span>🪙</span><b class="coin-count">0</b></div>
+      <div class="coins"><span class="coin-ico">🪙</span><b class="coin-count">0</b></div>
       <div class="top-btns">
         <button id="btn-install" class="icon-btn hidden" aria-label="Install app">📲</button>
-        <button id="btn-music" class="icon-btn" aria-label="Music">🎵</button>
-        <button id="btn-sound" class="icon-btn" aria-label="Sound">🔊</button>
+        <button id="btn-gift" class="icon-btn gift hidden" aria-label="Daily gift">🎁</button>
+        <button id="btn-settings" class="icon-btn" aria-label="Settings">⚙️</button>
       </div>
     </div>
     <div class="home-main">
-      <h1 class="logo" aria-label="Snek Arena">
-        <span style="--i:0">S</span><span style="--i:1">N</span><span style="--i:2">E</span><span style="--i:3">K</span>
-        <small>ARENA</small>
-      </h1>
-      <canvas id="home-preview" class="home-preview"></canvas>
-      <input id="name-input" class="name-input" maxlength="14" placeholder="Type your name" autocomplete="off" spellcheck="false">
-      <button id="btn-play" class="btn btn-big btn-green">▶ PLAY</button>
-      <div class="row">
-        <button id="btn-skins" class="btn btn-purple">🎨 Skins</button>
-        <button id="btn-help" class="btn btn-blue">❓ How to play</button>
+      <div class="home-hero">
+        <h1 class="logo" aria-label="Snek Arena">
+          <span style="--i:0">S</span><span style="--i:1">N</span><span style="--i:2">E</span><span style="--i:3">K</span>
+          <small>ARENA</small>
+        </h1>
+        <div class="pedestal"><canvas id="home-preview" class="home-preview"></canvas></div>
       </div>
-      <div class="best">⭐ Best size: <b id="best-score">0</b></div>
+      <div class="home-actions">
+        <input id="name-input" class="name-input" maxlength="14" placeholder="Type your name" autocomplete="off" spellcheck="false" enterkeyhint="done">
+        <button id="btn-play" class="btn btn-big btn-green pulse">▶ PLAY</button>
+        <div class="row">
+          <button id="btn-skins" class="btn btn-purple">🎨 Skins</button>
+          <button id="btn-help" class="btn btn-blue">❓ How to play</button>
+        </div>
+        <div class="best">⭐ Best size: <b id="best-score">0</b></div>
+      </div>
     </div>
     <button id="btn-admin" class="admin-lock" aria-label="Grown-up settings">🔒</button>
+  </section>
+
+  <!-- Get ready: pick boosters -->
+  <section id="screen-ready" class="screen dim hidden">
+    <div class="card ready-card">
+      <div class="ready-head">
+        <button id="btn-ready-back" class="icon-btn dark" aria-label="Back">←</button>
+        <h2>Boosters</h2>
+        <div class="coins small"><span class="coin-ico">🪙</span><b class="coin-count">0</b></div>
+      </div>
+      <p class="muted">Tap to add power for this match!</p>
+      <div id="booster-grid" class="booster-grid"></div>
+      <button id="btn-go" class="btn btn-big btn-green">GO!</button>
+    </div>
   </section>
 
   <!-- Skin shop -->
@@ -66,7 +87,7 @@
     <header class="bar">
       <button id="btn-shop-back" class="btn btn-small btn-ghost">← Back</button>
       <h2>Skins</h2>
-      <div class="coins"><span>🪙</span><b class="coin-count">0</b></div>
+      <div class="coins"><span class="coin-ico">🪙</span><b class="coin-count">0</b></div>
     </header>
     <div id="shop-grid" class="shop-grid"></div>
   </section>
@@ -77,14 +98,39 @@
       <h2>How to play</h2>
       <ul class="tips">
         <li><span>👆</span><div><b>Steer</b> by dragging your finger anywhere (or point with the mouse, or use the arrow keys).</div></li>
-        <li><span>🍬</span><div><b>Eat the glowing dots</b> to grow bigger.</div></li>
-        <li><span>🔢</span><div>The <b>number</b> above each snake shows how big it is. <b style="color:#7cff8a">Green</b> = smaller than you, <b style="color:#ff6b6b">red</b> = bigger!</div></li>
-        <li><span>😋</span><div><b>Bigger snakes eat smaller ones.</b> Bump your head into a smaller snake to chomp it. Keep away from red ones!</div></li>
-        <li><span>⚡</span><div>Hold <b>BOOST</b> (second finger, mouse click or space) to zoom. It costs a little size.</div></li>
-        <li><span>🎁</span><div><b>Power-ups:</b> 🧲 magnet, ⚡ speed, ⭐ super star (eat anyone!) and 2× double growth.</div></li>
-        <li><span>👑</span><div>Be the <b>biggest snake</b> when the timer ends to win extra coins. Spend coins on new skins!</div></li>
+        <li><span>🍬</span><div><b>Eat the glowing dots</b> to grow. ⭐ stars are worth extra!</div></li>
+        <li><span>🔢</span><div>Every snake has a <b>number badge</b>. <b class="g">Green</b> = smaller, you can eat it. <b class="r">Red</b> = bigger, run away!</div></li>
+        <li><span>😋</span><div><b>Bigger snakes eat smaller ones.</b> Bump a smaller snake to chomp it. Eat several quickly for a combo!</div></li>
+        <li><span>⚡</span><div>Hold <b>BOOST</b> (or a second finger) to zoom. It costs a little size.</div></li>
+        <li><span>🎁</span><div><b>Power-ups:</b> 🧲 magnet · ⚡ zoom · ⭐ super star · 2× double · ❄️ freeze · 🍰 candy rain · 🍄 giant</div></li>
+        <li><span>🚀</span><div>Spend coins on <b>boosters</b> before a match, like an Extra Life ❤️.</div></li>
+        <li><span>👑</span><div>Be the <b>biggest snake</b> when time runs out to win!</div></li>
       </ul>
       <button id="btn-help-close" class="btn btn-green">Got it!</button>
+    </div>
+  </section>
+
+  <!-- Kid settings -->
+  <section id="screen-settings" class="screen dim hidden">
+    <div class="card settings-card">
+      <h2>Settings</h2>
+      <div class="toggles">
+        <button class="toggle" data-pref="sound"><span>🔊 Sound</span><i></i></button>
+        <button class="toggle" data-pref="music"><span>🎵 Music</span><i></i></button>
+        <button class="toggle" data-pref="haptics"><span>📳 Vibration</span><i></i></button>
+        <button class="toggle" data-pref="boostLeft"><span>🫲 Boost button on left</span><i></i></button>
+      </div>
+      <button id="btn-settings-close" class="btn btn-green">Done</button>
+    </div>
+  </section>
+
+  <!-- Daily gift -->
+  <section id="screen-gift" class="screen dim hidden">
+    <div class="card gift-card">
+      <h2>Daily Gift!</h2>
+      <button id="gift-box" class="gift-box" aria-label="Open gift">🎁</button>
+      <p id="gift-msg" class="muted">Tap the present!</p>
+      <button id="btn-gift-close" class="btn btn-green hidden">Yay!</button>
     </div>
   </section>
 
@@ -93,18 +139,22 @@
     <div class="card">
       <h2>Paused</h2>
       <button id="btn-resume" class="btn btn-big btn-green">▶ Resume</button>
-      <button id="btn-quit" class="btn btn-ghost">End match</button>
+      <div class="row">
+        <button id="btn-pause-settings" class="btn btn-small btn-ghost">⚙️ Settings</button>
+        <button id="btn-quit" class="btn btn-small btn-ghost">End match</button>
+      </div>
     </div>
   </section>
 
   <!-- Results -->
   <section id="screen-over" class="screen dim hidden">
     <div class="card over-card">
+      <div id="over-stars" class="stars"><span>★</span><span>★</span><span>★</span></div>
       <h2 id="over-title">Chomped!</h2>
       <p id="over-sub" class="muted"></p>
       <div id="over-stats" class="over-stats"></div>
       <div id="over-best" class="new-best hidden">⭐ NEW BEST! ⭐</div>
-      <div class="over-coins">+<b id="over-coins">0</b> 🪙</div>
+      <div class="over-coins">+<b id="over-coins">0</b> <span class="coin-ico">🪙</span></div>
       <ul id="over-breakdown" class="breakdown"></ul>
       <button id="btn-again" class="btn btn-big btn-green">▶ Play again</button>
       <div class="row">
@@ -117,6 +167,8 @@
   <!-- Grown-up PIN + settings (filled in by admin.js) -->
   <section id="screen-pin" class="screen dim hidden"></section>
   <section id="screen-admin" class="screen admin hidden"></section>
+
+  <canvas id="confetti" class="confetti"></canvas>
 
   <noscript><p style="color:#fff;text-align:center;padding:2em">Snek Arena needs JavaScript turned on.</p></noscript>
   <script type="module" src="js/main.js"></script>

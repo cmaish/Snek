@@ -152,11 +152,45 @@ export function pelletSprite(color) {
 }
 
 export const POWERUPS = {
-  magnet: { icon: '🧲', color: '#ff4f6d', label: 'Magnet', time: 10 },
-  speed: { icon: '⚡', color: '#ffb703', label: 'Speed', time: 6 },
-  shield: { icon: '⭐', color: '#ffd23f', label: 'Super Star', time: 6 },
-  double: { icon: '2×', color: '#3ddc97', label: 'Double Growth', time: 12 },
+  magnet: { icon: '🧲', color: '#ff4f6d', label: 'Magnet!', time: 10, desc: 'Pulls food to you' },
+  speed: { icon: '⚡', color: '#ffb703', label: 'Zoom!', time: 6, desc: 'Super speed' },
+  shield: { icon: '⭐', color: '#ffd23f', label: 'Super Star!', time: 6, desc: 'Eat anyone!' },
+  double: { icon: '2×', color: '#3ddc97', label: 'Double Growth!', time: 12, desc: 'Grow twice as fast' },
+  freeze: { icon: '❄️', color: '#5fd3ff', label: 'Freeze!', time: 5, desc: 'Slows everyone else' },
+  feast: { icon: '🍰', color: '#ff7eb6', label: 'Candy Rain!', time: 0, desc: 'A shower of food' },
+  giant: { icon: '🍄', color: '#ff7b54', label: 'GIANT!', time: 8, desc: 'Fight like you\'re 50% bigger' },
 };
+
+const starCache = new Map();
+/** A glowing star — used for bonus pellets. */
+export function starSprite(color) {
+  let c = starCache.get(color);
+  if (c) return c;
+  c = mk(64);
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32);
+  gr.addColorStop(0, color + 'bb');
+  gr.addColorStop(1, color + '00');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 7 : 16;
+    g.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r);
+  }
+  g.closePath();
+  const core = g.createLinearGradient(20, 18, 44, 46);
+  core.addColorStop(0, '#ffffff');
+  core.addColorStop(0.4, shade(color, 0.3));
+  core.addColorStop(1, color);
+  g.fillStyle = core;
+  g.fill();
+  g.lineWidth = 2;
+  g.strokeStyle = shade(color, -0.3);
+  g.stroke();
+  starCache.set(color, c);
+  return c;
+}
 
 const puCache = new Map();
 export function powerupSprite(type) {
@@ -228,6 +262,14 @@ export function drawFace(g, x, y, r, ang, skin, st = {}) {
     g.fill();
   }
 
+  if (eyes === 'cute') {
+    g.fillStyle = 'rgba(255,90,140,0.45)';
+    for (const side of [-1, 1]) {
+      g.beginPath();
+      g.ellipse(r * 0.05, side * r * 0.8, r * 0.2, r * 0.13, 0, 0, TAU);
+      g.fill();
+    }
+  }
   const er = r * (eyes === 'cute' ? 0.4 : eyes === 'silly' ? 0.37 : 0.34);
   const ex = r * 0.22, ey = r * 0.47;
   const look = (st.look ?? ang) - ang;
@@ -474,6 +516,13 @@ export function drawHat(g, type, x, y, s, t = 0) {
   g.restore();
 }
 
+/** Body thickness multiplier for segment i of n (tail tapers to a point). */
+export function taper(i, n) {
+  const start = n * 0.55;
+  if (n < 8 || i < start) return 1;
+  return 1 - 0.55 * ((i - start) / (n - start));
+}
+
 // ------------------------------------------------------------- preview ----
 /** Draws a wiggling snake wearing `skin` into a canvas context. */
 export function drawSnakePreview(g, skin, w, h, t = 0, opts = {}) {
@@ -490,15 +539,16 @@ export function drawSnakePreview(g, skin, w, h, t = 0, opts = {}) {
   }
   g.fillStyle = 'rgba(10,8,40,0.25)';
   g.beginPath();
-  for (const [x, y] of pts) { g.moveTo(x + r, y + r * 0.35); g.arc(x, y + r * 0.35, r, 0, TAU); }
+  pts.forEach(([x, y], i) => { const ri = r * taper(i, n); g.moveTo(x + ri, y + r * 0.35); g.arc(x, y + r * 0.35, ri, 0, TAU); });
   g.fill();
   for (let i = n - 1; i >= 1; i--) {
     const [x, y] = pts[i];
-    g.drawImage(segSprite(p, i, n, t), x - r, y - r, r * 2, r * 2);
+    const ri = r * taper(i, n);
+    g.drawImage(segSprite(p, i, n, t), x - ri, y - ri, ri * 2, ri * 2);
   }
   const [hx, hy] = pts[0];
   const ang = Math.atan2(hy - pts[1][1], hx - pts[1][0]);
-  const hr = r * 1.2;
+  const hr = r * 1.25;
   g.drawImage(segSprite(p, 0, n, t), hx - hr, hy - hr, hr * 2, hr * 2);
   const blink = (t % 3.2) < 0.12 ? 1 : 0;
   drawFace(g, hx, hy, hr, ang, skin, { t, blink, tongue: (t % 2.6) > 2.2, look: ang });
