@@ -20,7 +20,13 @@ It's a Progressive Web App made of plain static files (HTML/CSS/JS, no build ste
 **Pre-game boosters** (bought with coins on the screen after PLAY):
 🍔 Big Start · 🫧 Bubble Shield · 🧲 Super Magnet · 🚀 Turbo Fuel (free boosting) · ❤️ Extra Life · 💰 Coin Rush (double coins)
 
-**Kid settings** (⚙️ on the home screen): sound, music, vibration, boost button on the left for left-handers, and "Extended UI" to show the scoreboard and radar (off by default for a cleaner screen). There's also a 🎁 daily gift with a streak bonus.
+**Adventure** (🗺️ on the home screen): 32 levels across 4 worlds (Meadow Valley, Candy Land, Ocean Deep, Space Station), each with its own arena theme. Every level has a goal (grow to a size, eat snakes, collect ⭐ stars, get a combo, finish #1) and earns 1–3 stars based on how fast you do it. The last level of each world is a **boss** (Big Bertha, Sir Sugarfang, Captain Kraken, Galactic Gus). Levels unlock in order; the grown-up difficulty acts as a cap, so "Easy" keeps every world easy.
+
+**Levels, missions and trophies:** every match earns XP. Levelling up gives coins and unlocks free hats, trails, arenas and the Snake Maker. Three **daily missions** refresh every day, and ten **trophies** each have bronze/silver/gold tiers with coin rewards. The Trophies screen also shows lifetime stats.
+
+**Customise** (shop): bodies, 42 heads, 20 hats (9 of them new: pirate, chef, cowboy, wizard, flower crown, headphones, beanie, viking, Santa), 11 trails that follow your snake (sparkles, bubbles, hearts, stars, music, leaves, snow, fire, rainbow, confetti) and 8 arena themes for Quick Play. The **Snake Maker** lets kids design their own body (colours, pattern, eyes).
+
+**Kid settings** (⚙️ on the home screen, also where you set your name): sound, music, vibration, boost button on the left for left-handers, and "Extended UI" to show the scoreboard and radar (off by default for a cleaner screen). There's also a 🎁 daily gift with a streak bonus.
 
 ## Grown-up settings (admin menu)
 
@@ -31,7 +37,7 @@ Tap the faint 🔒 in the bottom-right corner of the home screen (or open `…/#
 | 🐶 Heads | Set each head's price (0 = free) or hide it; make every head free in one tap. |
 | 🎨 Skins | Create, edit, duplicate, reorder, hide or delete skins. Set colours, pattern, eyes, hat, price, "free for everyone", and whether bots can wear it. Live preview. |
 | 🎮 Game rules | Number of bots, difficulty, whether bots hunt the player, bounce off bigger snakes (on by default), can't-be-eaten gentle mode (on by default; turn off for a real challenge), match length, arena size, food amount, starting size, speed, spawn protection, boost on/off, names on/off, coin multiplier, which power-ups appear, booster prices (or turn boosters off), daily gift size. |
-| 🪙 Player progress | Set/add coins, unlock or re-lock skins, reset best score or all progress. |
+| 🪙 Player progress | Set/add coins, set the player level, unlock every Adventure level, unlock or re-lock everything in the shop, reset best score or all progress. |
 | 💾 Backup | Export skins, head prices + rules as `config.json`, or import one. |
 | 🔑 PIN | Change the PIN. |
 
@@ -82,6 +88,9 @@ public/              ← upload this folder
   js/
     main.js     screens, HUD, shop, boosters, results
     boosters.js pre-game booster list
+    adventure.js Adventure worlds, levels, goals, stars
+    progression.js XP/levels, daily missions, trophies
+    cosmetics.js hats, trails, arena themes (+ previews)
     game.js     arena simulation + rendering
     snake.js    snake movement & drawing
     bots.js     bot AI

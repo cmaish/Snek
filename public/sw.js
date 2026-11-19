@@ -1,7 +1,7 @@
 // Service worker: makes the game work offline.
 // Bump VERSION when you deploy to force every device to refresh at once
 // (otherwise updates are picked up in the background on the next launch).
-const VERSION = 'snek-v11';
+const VERSION = 'snek-v12';
 const ASSETS = [
   './',
   'index.html',
@@ -9,11 +9,14 @@ const ASSETS = [
   'config.json',
   'css/style.css',
   'js/main.js',
+  'js/progression.js',
   'js/admin.js',
+  'js/adventure.js',
   'js/audio.js',
   'js/boosters.js',
   'js/bots.js',
   'js/config.js',
+  'js/cosmetics.js',
   'js/game.js',
   'js/heads.js',
   'js/input.js',

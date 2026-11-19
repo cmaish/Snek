@@ -4,6 +4,7 @@ import { Snake } from './snake.js';
 import { updateBot, newBrain, DIFFICULTY } from './bots.js';
 import { pelletSprite, starSprite, powerupSprite, POWERUPS, RAINBOW_COLORS, skinColor, ballSprite, glowSprite } from './render.js';
 import { sfx } from './audio.js';
+import { THEMES, makeTrailParticle, drawTrailParticle } from './cosmetics.js';
 
 const ARENA = { small: 1800, medium: 2600, large: 3600 };
 const DENSITY = { low: 0.55, normal: 1, high: 1.7 };
@@ -115,7 +116,15 @@ export class Game {
   }
 
   // ------------------------------------------------------------ setup ----
-  setup(mode, { settings, skins, skin, name, boosters = [], head = 'snake', heads = [] }) {
+  setup(mode, { settings, skins, skin, name, boosters = [], head = 'snake', heads = [], theme = 'classic', trail = 'none', level = null }) {
+    this.theme = THEMES[theme] || THEMES.classic;
+    this.trailKind = trail;
+    this.trailAcc = 0;
+    this.cosmetic = [];
+    this.level = level;
+    this.goal = level ? { type: level.goal, target: level.target, value: 0, done: false } : null;
+    this.boss = null;
+    this.matchStats = { stars: 0, powerups: 0 };
     this.mode = mode;
     this.settings = settings;
     this.skins = skins;
@@ -163,11 +172,12 @@ export class Game {
     this.pelletTarget = Math.round(((Math.PI * this.R * this.R) / 12000) * (DENSITY[settings.pelletDensity] || 1));
     for (let i = 0; i < this.pelletTarget; i++) this.spawnNatural();
 
+    const fl = this.theme.floor;
     this.floorGrad = this.ctx.createRadialGradient(0, 0, 0, 0, 0, this.R);
-    this.floorGrad.addColorStop(0, '#6152e0');
-    this.floorGrad.addColorStop(0.6, '#4a3cc4');
-    this.floorGrad.addColorStop(0.92, '#3a2ca6');
-    this.floorGrad.addColorStop(1, '#271b80');
+    this.floorGrad.addColorStop(0, fl[0]);
+    this.floorGrad.addColorStop(0.6, fl[1]);
+    this.floorGrad.addColorStop(0.92, fl[2]);
+    this.floorGrad.addColorStop(1, fl[3]);
 
     this.player = null;
     if (mode === 'play') {
@@ -185,6 +195,7 @@ export class Game {
     }
     const bots = mode === 'demo' ? 12 : settings.botCount;
     for (let i = 0; i < bots; i++) this.spawnBot(true);
+    if (level && level.boss) this.spawnBoss(level);
     for (let i = 0; i < 2; i++) this.spawnPowerup();
     const p = this.player;
     this.cam = { x: p ? p.head.x : 0, y: p ? p.head.y : 0, zoom: p ? 1.6 : 0.75, lx: 0, ly: 0 };
@@ -333,7 +344,7 @@ export class Game {
       if (n !== this.lastCount) {
         this.lastCount = n;
         if (n >= 1 && n <= 3) { sfx.beep(); this.haptic(12); }
-        if (n <= 0) { sfx.go(); this.haptic(30); }
+        if (n <= 0) { sfx.go(); this.haptic(30); if (this.level && this.hooks.goalText) setTimeout(() => this.showBanner('🎯 GOAL', '#ffe14d', this.hooks.goalText(this.level)), 600); }
       }
       if (P) P.placeAt(P.head.x, P.head.y, P.targetAngle);
       this.updateFx(dt);
@@ -359,7 +370,8 @@ export class Game {
     this.updatePellets(dt);
     this.collide();
     this.updatePowerups(dt);
-    if (P && P.alive && !this.over) this.checkMilestones();
+    if (P && P.alive && !this.over) { this.checkMilestones(); this.checkGoal(); this.emitTrail(dt); }
+    this.updateCosmetic(dt);
 
     if (this.snakes.some((s) => !s.alive && !s.isPlayer)) {
       this.snakes = this.snakes.filter((s) => s.alive || s.isPlayer);
@@ -419,7 +431,7 @@ export class Game {
           if (s === P) {
             sfx.pop();
             if (p.v >= 2) this.floatText(h.x, h.y - s._r * 2, '+' + Math.round(gained), '#fff6a0', 16);
-            if (p.star) this.ring(h.x, h.y, p.c, s._r * 3);
+            if (p.star) { this.ring(h.x, h.y, p.c, s._r * 3); this.matchStats.stars++; }
           }
         } else {
           p.x += (dx / d) * step;
@@ -490,6 +502,7 @@ export class Game {
     const def = POWERUPS[type];
     const h = s.head;
     const me = s === this.player;
+    if (me) this.matchStats.powerups++;
     if (def.time) s.power[type] = def.time;
     if (type === 'freeze') {
       this.freezeT = def.time;
@@ -676,7 +689,7 @@ export class Game {
       this.deathPos = { x: h.x, y: h.y };
       this.endMatch('eaten', killer);
     } else {
-      this.respawns.push(this.time + rand(1.5, 3.5));
+      if (!victim.isBoss) this.respawns.push(this.time + rand(1.5, 3.5));
       if (killer && killer.isPlayer) {
         sfx.gulp();
         this.haptic(40);
@@ -713,6 +726,61 @@ export class Game {
     else this.showBanner('❤️ EXTRA LIFE!', '#ff6b9a', 'Back in the game!');
   }
 
+  /** Adventure: a big named boss snake that doesn't come back once eaten. */
+  spawnBoss(level) {
+    const def = level.boss;
+    const base = this.skins.find((s) => s.id === def.skin) || this.skins[0];
+    const { x, y } = this.safeSpot(900);
+    const b = new Snake({ name: def.name, skin: { ...base, hat: 'crown' }, headId: def.head, x, y, angle: Math.random() * TAU, length: level.target, speedMul: this.diff.speed });
+    b.isBoss = true;
+    b.ai = newBrain();
+    this.snakes.push(b);
+    this.boss = b;
+  }
+
+  checkGoal() {
+    const G = this.goal, P = this.player;
+    if (!G || G.done) return;
+    switch (G.type) {
+      case 'size': G.value = Math.floor(P.mass); break;
+      case 'eat': G.value = P.kills; break;
+      case 'stars': G.value = this.matchStats.stars; break;
+      case 'combo': G.value = this.bestStreak; break;
+      case 'boss': G.value = this.boss && !this.boss.alive ? 1 : 0; G.target = 1; break;
+      case 'top': {
+        const r = this.ranking();
+        G.value = r[0] === P ? 1 : 0;
+        return; // decided when the timer runs out
+      }
+    }
+    if (G.value >= G.target) {
+      G.done = true;
+      this.endMatch('goal');
+    }
+  }
+
+  emitTrail(dt) {
+    if (!this.trailKind || this.trailKind === 'none') return;
+    const P = this.player;
+    this.trailAcc += dt * (P.boostNow ? 2 : 1);
+    if (this.trailAcc < 0.06) return;
+    this.trailAcc = 0;
+    const tail = P.segs[Math.max(0, P.segs.length - 2)];
+    const p = makeTrailParticle(this.trailKind, tail.x, tail.y, this.t);
+    if (p) {
+      p.size *= 0.8 + P.radius() / 25;
+      this.cosmetic.push(p);
+      if (this.cosmetic.length > 120) this.cosmetic.shift();
+    }
+  }
+
+  updateCosmetic(dt) {
+    for (const p of this.cosmetic) {
+      p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.life -= dt;
+    }
+    if (this.cosmetic.length) this.cosmetic = this.cosmetic.filter((p) => p.life > 0);
+  }
+
   endMatch(reason, killer) {
     if (this.over || this.mode !== 'play') return;
     this.over = true;
@@ -729,15 +797,31 @@ export class Game {
       bestStreak: this.bestStreak,
       coinRush: this.boosters.has('coins'),
       time: this.time,
+      timeLeft: this.timeLeft === Infinity ? 0 : this.timeLeft,
+      timeTotal: this.settings.matchSeconds,
+      secondSize: ranked.length > 1 ? Math.floor((ranked[0] === P ? ranked[1] : ranked[0]).mass) : 0,
+      starsEaten: this.matchStats.stars,
+      powerups: this.matchStats.powerups,
+      level: this.level,
+      goalDone: false,
     };
+    if (this.goal) this.result.goalDone = this.goal.type === 'top' ? reason === 'time' && this.result.rank === 1 : this.goal.done;
+    if (reason === 'goal') {
+      P.ghost = 999;
+      this.showBanner('LEVEL COMPLETE!', '#7cff8a');
+      sfx.win();
+      this.flash = 0.3;
+    }
     if (reason !== 'eaten') {
       P.ghost = 999;
       if (reason === 'time') {
-        this.showBanner(this.result.rank === 1 ? '👑 WINNER! 👑' : "TIME'S UP!", '#ffe14d');
+        if (this.goal && this.goal.type !== 'top') this.showBanner("TIME'S UP!", '#ffe14d');
+        else this.showBanner(this.result.rank === 1 ? '👑 WINNER! 👑' : "TIME'S UP!", '#ffe14d');
         if (this.result.rank === 1) sfx.win(); else sfx.go();
       }
     }
     this.endIn = reason === 'eaten' ? 1.8 : reason === 'quit' ? 0.01 : 1.6;
+    this.cosmetic = [];
   }
 
   // ------------------------------------------------------------ effects ----
@@ -879,6 +963,7 @@ export class Game {
       powers,
       ghost: P ? Math.max(0, P.ghost) : 0,
       lives: this.lives,
+      goal: this.goal ? { ...this.goal, bossSize: this.boss && this.boss.alive ? Math.floor(this.boss.mass) : 0 } : null,
     });
   }
 
@@ -894,7 +979,7 @@ export class Game {
     g.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * (w / 2 - cx * sc), dpr * (h / 2 - cy * sc));
 
     // space outside the arena
-    g.fillStyle = '#160f3e';
+    g.fillStyle = this.theme.outside;
     g.fillRect(view.x0, view.y0, view.x1 - view.x0, view.y1 - view.y0);
     g.fillStyle = this.starPattern;
     g.fillRect(view.x0, view.y0, view.x1 - view.x0, view.y1 - view.y0);
@@ -913,12 +998,12 @@ export class Game {
 
     // candy-stripe border with glow
     g.lineWidth = 64;
-    g.strokeStyle = 'rgba(255,79,163,0.16)';
+    g.strokeStyle = this.theme.border + '29';
     g.beginPath();
     g.arc(0, 0, R + 20, 0, TAU);
     g.stroke();
     g.lineWidth = 34;
-    g.strokeStyle = '#ff4fa3';
+    g.strokeStyle = this.theme.border;
     g.beginPath();
     g.arc(0, 0, R + 17, 0, TAU);
     g.stroke();
@@ -928,7 +1013,7 @@ export class Game {
     g.stroke();
     g.setLineDash([]);
     g.lineWidth = 8;
-    g.strokeStyle = '#ffd23f';
+    g.strokeStyle = this.theme.rim;
     g.beginPath();
     g.arc(0, 0, R + 38, 0, TAU);
     g.stroke();
@@ -939,6 +1024,10 @@ export class Game {
       g.globalAlpha = f * 0.8;
       g.drawImage(glowSprite(tr.c), tr.x - s, tr.y - s, s * 2, s * 2);
     }
+    g.globalAlpha = 1;
+
+    // cosmetic trail (behind everything else)
+    for (const c of this.cosmetic) drawTrailParticle(g, c);
     g.globalAlpha = 1;
 
     // pellets
@@ -1151,7 +1240,7 @@ export class Game {
       if (s === P) bg = '#7b4dff';
       else if (P && P.alive) bg = s.clashMass() > pm ? '#ff4757' : '#22c55e';
       if (s.power.shield > 0) bg = '#f5a300';
-      const label = (s === leader ? '👑' : '') + Math.floor(s.mass) + (s.power.giant > 0 ? '🍄' : '');
+      const label = (s.isBoss ? '💀 ' : s === leader ? '👑' : '') + Math.floor(s.mass) + (s.power.giant > 0 ? '🍄' : '');
       g.font = `900 ${size}px ${FONT}`;
       const tw = g.measureText(label).width + size * 0.9, th = size * 1.4;
       g.fillStyle = 'rgba(10,4,40,0.35)';
@@ -1180,6 +1269,30 @@ export class Game {
     if (this.mode !== 'play' || !this.player || !this.player.alive || this.countdown > 0) return;
     const w = this.w, h = this.h, m = 40;
     const P = this.player.head;
+    const B = this.boss;
+    if (B && B.alive) {
+      const bh = B.head;
+      if (!(bh.x > view.x0 + 30 && bh.x < view.x1 - 30 && bh.y > view.y0 + 30 && bh.y < view.y1 - 30)) {
+        const s = this.worldToScreen(bh);
+        const cx = w / 2, cy = h / 2, dx = s.x - cx, dy = s.y - cy;
+        const k = Math.min((w / 2 - m) / Math.abs(dx || 1e-6), (h / 2 - m - 50) / Math.abs(dy || 1e-6));
+        const a = Math.atan2(dy, dx);
+        g.save();
+        g.translate(cx + dx * k, cy + dy * k);
+        g.fillStyle = '#ff4757';
+        g.beginPath();
+        g.moveTo(Math.cos(a) * 36, Math.sin(a) * 36);
+        g.lineTo(Math.cos(a + 2.3) * 20, Math.sin(a + 2.3) * 20);
+        g.lineTo(Math.cos(a - 2.3) * 20, Math.sin(a - 2.3) * 20);
+        g.closePath();
+        g.fill();
+        g.beginPath(); g.arc(0, 0, 22, 0, TAU); g.fill();
+        g.lineWidth = 3; g.strokeStyle = '#fff'; g.stroke();
+        g.font = '24px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText('💀', 0, 2);
+        g.restore();
+      }
+    }
     for (const pu of this.powerups) {
       if (pu.x > view.x0 + 30 && pu.x < view.x1 - 30 && pu.y > view.y0 + 30 && pu.y < view.y1 - 30) continue;
       if (Math.hypot(pu.x - P.x, pu.y - P.y) > 1300) continue;

@@ -31,6 +31,7 @@
     <div id="hud-timer" class="hud-timer">3:00</div>
     <ol id="hud-board" class="board"></ol>
     <canvas id="minimap"></canvas>
+    <div id="hud-goal" class="hud-goal hidden"><span class="g-ico"></span><span class="g-text"></span><span class="g-bar"><i></i></span></div>
     <button id="btn-boost" class="boost-btn" aria-label="Boost"><span class="bolt">⚡</span><span>BOOST</span></button>
     <div id="toasts" class="toasts"></div>
   </div>
@@ -39,7 +40,13 @@
   <!-- Home -->
   <section id="screen-home" class="screen home">
     <div class="home-top">
-      <div class="coins"><span class="coin-ico">🪙</span><b class="coin-count">0</b></div>
+      <div class="home-stats">
+        <div class="coins"><span class="coin-ico">🪙</span><b class="coin-count">0</b></div>
+        <button id="btn-level" class="level-pill" aria-label="Your level">
+          <span class="lv">Lv <b id="home-level">1</b></span>
+          <span class="xp-bar"><i id="home-xp"></i></span>
+        </button>
+      </div>
       <div class="top-btns">
         <button id="btn-install" class="icon-btn hidden" aria-label="Install app">📲</button>
         <button id="btn-fullscreen" class="icon-btn hidden" aria-label="Full screen" title="Full screen"></button>
@@ -56,13 +63,14 @@
         <div class="pedestal"><canvas id="home-preview" class="home-preview"></canvas></div>
       </div>
       <div class="home-actions">
-        <input id="name-input" class="name-input" maxlength="14" placeholder="Type your name" autocomplete="off" spellcheck="false" enterkeyhint="done">
         <button id="btn-play" class="btn btn-big btn-green pulse">▶ PLAY</button>
-        <div class="row">
-          <button id="btn-skins" class="btn btn-purple">🎨 Skins</button>
-          <button id="btn-help" class="btn btn-blue">❓ How to play</button>
+        <button id="btn-adventure" class="btn btn-big btn-orange">🗺️ ADVENTURE</button>
+        <div class="tiles">
+          <button id="btn-skins" class="tile"><span>🎨</span>Customise</button>
+          <button id="btn-missions" class="tile"><span>📋</span>Missions<em id="badge-missions" class="badge hidden">0</em></button>
+          <button id="btn-trophies" class="tile"><span>🏆</span>Trophies<em id="badge-trophies" class="badge hidden">0</em></button>
+          <button id="btn-help" class="tile"><span>❓</span>Help</button>
         </div>
-        <div class="best">⭐ Best size: <b id="best-score">0</b></div>
       </div>
     </div>
     <button id="btn-admin" class="admin-lock" aria-label="Grown-up settings">🔒</button>
@@ -73,27 +81,89 @@
     <div class="card ready-card">
       <div class="ready-head">
         <button id="btn-ready-back" class="icon-btn dark" aria-label="Back">←</button>
-        <h2>Boosters</h2>
+        <h2 id="ready-title">Boosters</h2>
         <div class="coins small"><span class="coin-ico">🪙</span><b class="coin-count">0</b></div>
       </div>
+      <div id="ready-goal" class="ready-goal hidden"></div>
       <p class="muted">Tap to add power for this match!</p>
       <div id="booster-grid" class="booster-grid"></div>
       <button id="btn-go" class="btn btn-big btn-green">GO!</button>
     </div>
   </section>
 
-  <!-- Skin shop -->
+  <!-- Adventure map -->
+  <section id="screen-adventure" class="screen list-screen hidden">
+    <header class="bar">
+      <button id="btn-adv-back" class="btn btn-small btn-ghost">← Back</button>
+      <h2>Adventure</h2>
+      <div class="coins"><span>⭐</span><b id="adv-stars">0</b></div>
+    </header>
+    <div id="adv-map" class="adv-map"></div>
+  </section>
+
+  <!-- Daily missions -->
+  <section id="screen-missions" class="screen dim hidden">
+    <div class="card missions-card">
+      <h2>📋 Daily Missions</h2>
+      <p id="missions-reset" class="muted"></p>
+      <div id="missions-list" class="missions-list"></div>
+      <button id="btn-missions-close" class="btn btn-green">Done</button>
+    </div>
+  </section>
+
+  <!-- Trophies + stats -->
+  <section id="screen-trophies" class="screen list-screen hidden">
+    <header class="bar">
+      <button id="btn-trophies-back" class="btn btn-small btn-ghost">← Back</button>
+      <h2>Trophies</h2>
+      <div class="coins"><span class="coin-ico">🪙</span><b class="coin-count">0</b></div>
+    </header>
+    <div class="scroll-body">
+      <div id="stats-strip" class="stats-strip"></div>
+      <div id="trophy-list" class="trophy-list"></div>
+    </div>
+  </section>
+
+  <!-- Customise (shop) -->
   <section id="screen-shop" class="screen shop hidden">
     <header class="bar">
       <button id="btn-shop-back" class="btn btn-small btn-ghost">← Back</button>
-      <h2>Skins</h2>
+      <h2>Customise</h2>
       <div class="coins"><span class="coin-ico">🪙</span><b class="coin-count">0</b></div>
     </header>
     <div class="shop-tabs">
-      <button class="shop-tab active" data-tab="bodies">🐍 Bodies</button>
-      <button class="shop-tab" data-tab="heads">🐶 Heads</button>
+      <button class="shop-tab active" data-tab="bodies">🐍<span>Bodies</span></button>
+      <button class="shop-tab" data-tab="heads">🐶<span>Heads</span></button>
+      <button class="shop-tab" data-tab="hats">🎩<span>Hats</span></button>
+      <button class="shop-tab" data-tab="trails">✨<span>Trails</span></button>
+      <button class="shop-tab" data-tab="arenas">🏟️<span>Arenas</span></button>
     </div>
     <div id="shop-grid" class="shop-grid"></div>
+  </section>
+
+  <!-- Snake Maker -->
+  <section id="screen-maker" class="screen dim hidden">
+    <div class="card maker-card">
+      <h2>🎨 Snake Maker</h2>
+      <canvas id="maker-preview" class="maker-preview"></canvas>
+      <div class="maker-section">
+        <span class="maker-label">Colours <small>(tap a slot, then a colour)</small></span>
+        <div id="maker-slots" class="maker-slots"></div>
+        <div id="maker-palette" class="maker-palette"></div>
+      </div>
+      <div class="maker-section">
+        <span class="maker-label">Pattern</span>
+        <div id="maker-patterns" class="chip-row"></div>
+      </div>
+      <div class="maker-section">
+        <span class="maker-label">Eyes</span>
+        <div id="maker-eyes" class="chip-row"></div>
+      </div>
+      <div class="row">
+        <button id="btn-maker-cancel" class="btn btn-small btn-ghost">Cancel</button>
+        <button id="btn-maker-save" class="btn btn-green">Save &amp; wear</button>
+      </div>
+    </div>
   </section>
 
   <!-- How to play -->
@@ -107,8 +177,9 @@
         <li><span>😋</span><div><b>Bump a smaller snake to chomp it.</b> Crash into a bigger one and you just bounce off — but big snakes can bite your tail! Eat several quickly for a combo.</div></li>
         <li><span>⚡</span><div>Hold <b>BOOST</b> (or a second finger) to zoom. It costs a little size.</div></li>
         <li><span>🎁</span><div><b>Power-ups:</b> 🧲 magnet · ⚡ zoom · ⭐ super star · 2× double · ❄️ freeze · 🍰 candy rain · 🍄 giant</div></li>
-        <li><span>🐶</span><div>Spend coins on new <b>bodies and heads</b> — mix and match! — and on <b>boosters</b> like an Extra Life ❤️.</div></li>
-        <li><span>👑</span><div>Be the <b>biggest snake</b> when time runs out to win!</div></li>
+        <li><span>🗺️</span><div><b>Adventure:</b> beat levels to earn up to 3 stars each. Every world ends with a <b>boss</b> 💀.</div></li>
+        <li><span>🆙</span><div>Every match gives <b>XP</b>. Level up for coins and free hats, trails and arenas!</div></li>
+        <li><span>📋</span><div>Do your <b>daily missions</b> and collect <b>trophies</b> for extra coins.</div></li>
       </ul>
       <button id="btn-help-close" class="btn btn-green">Got it!</button>
     </div>
@@ -118,6 +189,9 @@
   <section id="screen-settings" class="screen dim hidden">
     <div class="card settings-card">
       <h2>Settings</h2>
+      <label class="name-field">Your name
+        <input id="name-input" class="name-input" maxlength="14" placeholder="Type your name" autocomplete="off" spellcheck="false" enterkeyhint="done">
+      </label>
       <div class="toggles">
         <button class="toggle" data-pref="sound"><span>🔊 Sound</span><i></i></button>
         <button class="toggle" data-pref="music"><span>🎵 Music</span><i></i></button>
@@ -143,6 +217,7 @@
   <section id="screen-pause" class="screen dim hidden">
     <div class="card">
       <h2>Paused</h2>
+      <p id="pause-goal" class="muted hidden"></p>
       <button id="btn-resume" class="btn btn-big btn-green">▶ Resume</button>
       <div class="row">
         <button id="btn-pause-settings" class="btn btn-small btn-ghost">⚙️ Settings</button>
@@ -161,9 +236,17 @@
       <div id="over-best" class="new-best hidden">⭐ NEW BEST! ⭐</div>
       <div class="over-coins">+<b id="over-coins">0</b> <span class="coin-ico">🪙</span></div>
       <ul id="over-breakdown" class="breakdown"></ul>
+      <div class="over-xp">
+        <span class="lv">Lv <b id="over-level">1</b></span>
+        <span class="xp-bar"><i id="over-xp-bar"></i></span>
+        <span id="over-xp" class="xp-gain">+0 XP</span>
+      </div>
+      <div id="over-levelup" class="levelup hidden"></div>
+      <div id="over-missions" class="over-missions"></div>
       <button id="btn-again" class="btn btn-big btn-green">▶ Play again</button>
       <div class="row">
-        <button id="btn-over-skins" class="btn btn-purple">🎨 Skins</button>
+        <button id="btn-over-skins" class="btn btn-purple">🎨 Customise</button>
+        <button id="btn-over-map" class="btn btn-orange hidden">🗺️ Map</button>
         <button id="btn-home" class="btn btn-blue">🏠 Home</button>
       </div>
     </div>

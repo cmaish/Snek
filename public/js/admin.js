@@ -11,6 +11,8 @@ import { PATTERNS, EYES, HATS, sanitizeSkin, slugify } from './skins.js';
 import { drawSnakePreview } from './render.js';
 import { sfx } from './audio.js';
 import { BOOSTERS } from './boosters.js';
+import { HAT_ITEMS, TRAIL_ITEMS, THEME_ITEMS } from './cosmetics.js';
+import { LEVELS, totalAdventureStars } from './adventure.js';
 import { esc, pick, randInt, hslHex } from './util.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -437,6 +439,10 @@ function renderProgress(body) {
       <div><b>${progress.best}</b><span>best size</span></div>
       <div><b>${progress.games}</b><span>games played</span></div>
       <div><b>${progress.kills}</b><span>snakes eaten</span></div>
+      <div><b>${progress.level}</b><span>player level</span></div>
+      <div><b>${totalAdventureStars()}/${LEVELS.length * 3}</b><span>adventure stars</span></div>
+      <div><b>${progress.wins}</b><span>wins</span></div>
+      <div><b>${progress.totalStars}</b><span>stars collected</span></div>
     </div>
     <div class="form">
       <label>Set coins<input type="number" id="p-coins" min="0" step="10" value="${progress.coins}"></label>
@@ -445,10 +451,16 @@ function renderProgress(body) {
         <button class="btn btn-small btn-purple" data-add="100">+100</button>
         <button class="btn btn-small btn-purple" data-add="1000">+1000</button>
       </div>
-      <h3>Skins</h3>
+      <label>Player level (unlocks free hats, trails and arenas)<input type="number" id="p-level" min="1" max="99" value="${progress.level}"></label>
+      <div class="admin-actions"><button class="btn btn-small btn-green" id="p-level-set">Save level</button></div>
+      <h3>Adventure</h3>
       <div class="admin-actions">
-        <button class="btn btn-small btn-blue" id="p-unlock">Unlock every skin &amp; head</button>
-        <button class="btn btn-small btn-ghost" id="p-lock">Re-lock bought skins &amp; heads</button>
+        <button class="btn btn-small btn-blue" id="p-adv">${progress.advUnlockAll ? 'Lock levels again (play in order)' : 'Unlock every Adventure level'}</button>
+      </div>
+      <h3>Customisation</h3>
+      <div class="admin-actions">
+        <button class="btn btn-small btn-blue" id="p-unlock">Unlock everything (bodies, heads, hats, trails, arenas)</button>
+        <button class="btn btn-small btn-ghost" id="p-lock">Re-lock bought items</button>
       </div>
       <h3>Reset</h3>
       <div class="admin-actions">
@@ -462,17 +474,32 @@ function renderProgress(body) {
   $('#p-unlock').addEventListener('click', async () => {
     progress.unlocked = [...new Set([...progress.unlocked, ...getSkins().map((s) => s.id)])];
     progress.unlockedHeads = getHeads().map((h) => h.id);
+    progress.ownedHats = HAT_ITEMS.map((x) => x.id);
+    progress.ownedTrails = TRAIL_ITEMS.map((x) => x.id);
+    progress.ownedThemes = THEME_ITEMS.map((x) => x.id);
     done('Everything unlocked');
   });
   $('#p-lock').addEventListener('click', async () => {
-    if (!await ask('Lock all bought skins and heads again? (Free ones stay unlocked.)')) return;
+    if (!await ask('Lock all bought items again? (Free ones stay unlocked.)')) return;
     progress.unlocked = [];
     progress.unlockedHeads = [];
+    progress.ownedHats = [];
+    progress.ownedTrails = [];
+    progress.ownedThemes = [];
     done('Bought items locked');
+  });
+  $('#p-level-set').addEventListener('click', async () => {
+    progress.level = Math.min(99, Math.max(1, Math.floor(+$('#p-level').value || 1)));
+    progress.xp = 0;
+    done('Level saved');
+  });
+  $('#p-adv').addEventListener('click', async () => {
+    progress.advUnlockAll = !progress.advUnlockAll;
+    done(progress.advUnlockAll ? 'All Adventure levels unlocked' : 'Adventure levels play in order again');
   });
   $('#p-best').addEventListener('click', async () => { if (await ask('Reset the best score?')) { progress.best = 0; done('Best score reset'); } });
   $('#p-reset').addEventListener('click', async () => {
-    if (!await ask('Reset coins, unlocked skins, best score and stats? This cannot be undone.')) return;
+    if (!await ask('Reset coins, level, unlocked items, Adventure stars, missions, trophies and stats? This cannot be undone.')) return;
     resetProgress();
     flash('Progress reset');
     render();

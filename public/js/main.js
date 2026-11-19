@@ -1,6 +1,9 @@
-// App shell: screens, HUD, shop, boosters, results, and wiring everything together.
+// App shell: screens, HUD, shop, adventure, missions, trophies, results.
 import { loadConfig, getSettings, getSkins, getHeads } from './config.js';
-import { progress, saveProgress, isUnlocked, ensureSelected, isHeadUnlocked, ensureHead } from './storage.js';
+import {
+  progress, saveProgress, isUnlocked, ensureSelected, isHeadUnlocked, ensureHead, customSkin,
+  itemState, ownItem, selectedItem, selectItem,
+} from './storage.js';
 import { Game } from './game.js';
 import { Input } from './input.js';
 import { initAudio, sfx, setSound, setMusic, suspend } from './audio.js';
@@ -8,10 +11,18 @@ import { drawSnakePreview, POWERUPS } from './render.js';
 import { BOOSTERS } from './boosters.js';
 import { openPin } from './admin.js';
 import { esc, rand, pick, TAU } from './util.js';
+import { PATTERNS, EYES } from './skins.js';
+import { HAT_ITEMS, TRAIL_ITEMS, THEME_ITEMS, MAKER_LEVEL, drawThemePreview, drawTrailPreview } from './cosmetics.js';
+import { WORLDS, LEVELS, levelLabel, goalText, goalIcon, levelStars, totalAdventureStars, isLevelOpen, starsFor } from './adventure.js';
+import {
+  xpForLevel, addXp, dailyMissions, missionText, missionDef, missionReward, recordMissionStats, claimMission,
+  missionsClaimable, TROPHIES, TROPHY_REWARDS, MEDALS, trophyState, claimTrophy, trophiesClaimable, matchXp,
+} from './progression.js';
 
 const $ = (s) => document.querySelector(s);
-const SCREENS = ['home', 'ready', 'shop', 'help', 'settings', 'gift', 'pause', 'over', 'pin', 'admin'];
+const SCREENS = ['home', 'ready', 'adventure', 'missions', 'trophies', 'shop', 'maker', 'help', 'settings', 'gift', 'pause', 'over', 'pin', 'admin'];
 const POWER_ICONS = { ...Object.fromEntries(Object.entries(POWERUPS).map(([k, v]) => [k, [v.icon, v.color]])), turbo: ['🚀', '#ff9f1c'] };
+const DIFF_ORDER = ['easy', 'normal', 'hard'];
 
 let game, input;
 let state = 'home';
@@ -20,6 +31,7 @@ let wakeLock = null;
 let installEvt = null;
 let picked = new Set();
 let shopTab = 'bodies';
+let currentLevel = null; // adventure level being played (or null for quick play)
 
 export function show(name) {
   state = name;
@@ -40,11 +52,28 @@ function haptic(p) {
 
 function tap() { sfx.click(); haptic(8); }
 
+function shake(el) {
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+}
+
 /** Body classes for layout preferences (boost side, extended UI). */
 function applyPrefs() {
   document.body.classList.toggle('boost-left', progress.boostLeft);
   document.body.classList.toggle('ext-ui', progress.extendedUi);
   if (game) game.showRadar = progress.extendedUi;
+}
+
+/** The player's body skin with their chosen hat applied. */
+function playerSkin() {
+  const base = ensureSelected(getSkins());
+  const hat = selectedItem('hat', HAT_ITEMS).id;
+  return hat === 'auto' ? base : { ...base, hat };
+}
+
+function playerHead() {
+  return ensureHead(getHeads()).id;
 }
 
 // ------------------------------------------------------------- home ----
@@ -57,19 +86,29 @@ function giftReady() {
   return getSettings().dailyGift > 0 && progress.lastGift !== today();
 }
 
+function setBadge(id, n) {
+  const el = $(id);
+  el.textContent = n;
+  el.classList.toggle('hidden', !n);
+}
+
 function refreshHome() {
-  $('#best-score').textContent = progress.best;
-  $('#name-input').value = progress.name;
+  $('#home-level').textContent = progress.level;
+  $('#home-xp').style.width = Math.min(100, (progress.xp / xpForLevel(progress.level)) * 100) + '%';
   $('#btn-install').classList.toggle('hidden', !installEvt);
   $('#btn-gift').classList.toggle('hidden', !giftReady());
+  setBadge('#badge-missions', missionsClaimable());
+  setBadge('#badge-trophies', trophiesClaimable());
   applyPrefs();
 }
 
 function previewLoop(ts) {
   requestAnimationFrame(previewLoop);
   const t = ts / 1000;
-  if (state !== 'home') return;
-  const c = $('#home-preview');
+  let c = null, opts = null, skin = null;
+  if (state === 'home') { c = $('#home-preview'); opts = { segments: 18, head: playerHead() }; skin = playerSkin(); }
+  else if (state === 'maker') { c = $('#maker-preview'); opts = { segments: 16, head: playerHead() }; skin = makerSkin(); }
+  if (!c) return;
   const w = c.clientWidth, h = c.clientHeight;
   if (!w) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -77,12 +116,13 @@ function previewLoop(ts) {
   const g = c.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, w, h);
-  drawSnakePreview(g, ensureSelected(getSkins()), w, h, t, { segments: 18, head: ensureHead(getHeads()).id });
+  drawSnakePreview(g, skin, w, h, t, opts);
 }
 
 // ---------------------------------------------------------- settings ----
 function openSettings(from) {
   settingsReturn = from;
+  $('#name-input').value = progress.name;
   renderToggles();
   show('settings');
 }
@@ -127,96 +167,29 @@ function claimGift() {
 }
 
 // ------------------------------------------------------------- shop ----
-function openShop() {
+function openShop(tab) {
+  if (tab) shopTab = tab;
   show('shop');
   renderShop();
 }
 
-function renderShop() {
-  for (const b of document.querySelectorAll('.shop-tab')) b.classList.toggle('active', b.dataset.tab === shopTab);
-  if (shopTab === 'heads') return renderHeadShop();
-  const grid = $('#shop-grid');
-  grid.innerHTML = '';
-  const skins = getSkins().filter((s) => !s.hidden);
-  const sel = ensureSelected(getSkins());
-  for (const skin of skins) {
-    const owned = isUnlocked(skin);
-    const card = document.createElement('button');
-    card.className = 'skin-card' + (owned ? '' : ' locked') + (skin.id === sel.id ? ' selected' : '');
-    const cv = document.createElement('canvas');
-    const status = document.createElement('div');
-    status.className = 'skin-status';
-    const label = () => {
-      if (skin.id === ensureSelected(getSkins()).id) return '✅ Wearing';
-      if (owned) return 'Tap to wear';
-      return `🪙 ${skin.price.toLocaleString()}`;
-    };
-    status.textContent = label();
-    card.innerHTML = `<div class="skin-name">${esc(skin.name)}</div>${owned ? '' : '<span class="lock">🔒</span>'}`;
-    card.prepend(cv);
-    card.append(status);
-    grid.append(card);
-    requestAnimationFrame(() => {
-      const w = cv.clientWidth || 140, h = cv.clientHeight || 80, dpr = Math.min(2, window.devicePixelRatio || 1);
-      cv.width = w * dpr; cv.height = h * dpr;
-      const g = cv.getContext('2d');
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawSnakePreview(g, skin, w, h, 0.6, { segments: 12, head: ensureHead(getHeads()).id });
-    });
-    card.addEventListener('click', () => {
-      initAudio();
-      if (isUnlocked(skin)) {
-        progress.selected = skin.id;
-        saveProgress();
-        tap();
-        renderShop();
-        return;
-      }
-      if (progress.coins < skin.price) {
-        sfx.error();
-        haptic(40);
-        status.textContent = `Need 🪙 ${(skin.price - progress.coins).toLocaleString()} more`;
-        shake(card);
-        setTimeout(() => (status.textContent = label()), 1600);
-        return;
-      }
-      if (!card.dataset.confirm) {
-        card.dataset.confirm = '1';
-        status.textContent = 'Tap again to buy!';
-        card.classList.add('confirm');
-        tap();
-        setTimeout(() => { delete card.dataset.confirm; card.classList.remove('confirm'); status.textContent = label(); }, 2500);
-        return;
-      }
-      progress.coins -= skin.price;
-      progress.unlocked.push(skin.id);
-      progress.selected = skin.id;
-      saveProgress();
-      sfx.win();
-      haptic([20, 40, 20]);
-      const r = card.getBoundingClientRect();
-      confetti(60, r.left + r.width / 2, r.top + r.height / 2);
-      renderShop();
-      updateCoins();
-    });
-  }
-  updateCoins();
-}
-
-/** One buy/wear card for the shop (used for heads). */
-function shopCard({ name, price, owned, selected, draw, onWear, onBuy }) {
+/**
+ * One shop card. `state` is 'owned' | 'buy' | 'level'.
+ * Owned cards wear on tap; 'buy' asks for a second tap; 'level' explains the lock.
+ */
+function shopCard({ name, price, level = 1, state: st, selected, draw, onWear, onBuy, cls = '' }) {
   const card = document.createElement('button');
-  card.className = 'skin-card head-card' + (owned ? '' : ' locked') + (selected ? ' selected' : '');
+  card.className = `skin-card ${cls}` + (st === 'owned' ? '' : ' locked') + (st === 'level' ? ' level-lock' : '') + (selected ? ' selected' : '');
   const cv = document.createElement('canvas');
   const status = document.createElement('div');
   status.className = 'skin-status';
-  const label = () => (selected ? '✅ Wearing' : owned ? 'Tap to wear' : `🪙 ${price.toLocaleString()}`);
+  const label = () => (selected ? '✅ Wearing' : st === 'owned' ? 'Tap to use' : st === 'level' ? `🔒 Level ${level}` : `🪙 ${price.toLocaleString()}`);
   status.textContent = label();
-  card.innerHTML = `<div class="skin-name">${esc(name)}</div>${owned ? '' : '<span class="lock">🔒</span>'}`;
+  card.innerHTML = `<div class="skin-name">${esc(name)}</div>${st === 'owned' ? '' : `<span class="lock">${st === 'level' ? '🆙' : '🔒'}</span>`}`;
   card.prepend(cv);
   card.append(status);
   requestAnimationFrame(() => {
-    const w = cv.clientWidth || 140, h = cv.clientHeight || 96, dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = cv.clientWidth || 140, h = cv.clientHeight || 90, dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = w * dpr; cv.height = h * dpr;
     const g = cv.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -224,7 +197,15 @@ function shopCard({ name, price, owned, selected, draw, onWear, onBuy }) {
   });
   card.addEventListener('click', () => {
     initAudio();
-    if (owned) { tap(); onWear(); return; }
+    if (st === 'owned') { tap(); onWear(); return; }
+    if (st === 'level') {
+      sfx.error();
+      haptic(40);
+      status.textContent = `Reach level ${level}!`;
+      shake(card);
+      setTimeout(() => (status.textContent = label()), 1600);
+      return;
+    }
     if (progress.coins < price) {
       sfx.error();
       haptic(40);
@@ -247,31 +228,236 @@ function shopCard({ name, price, owned, selected, draw, onWear, onBuy }) {
     const r = card.getBoundingClientRect();
     confetti(60, r.left + r.width / 2, r.top + r.height / 2);
     onBuy();
+    saveProgress();
+    updateCoins();
   });
   return card;
 }
 
-function renderHeadShop() {
+function renderShop() {
+  for (const b of document.querySelectorAll('.shop-tab')) b.classList.toggle('active', b.dataset.tab === shopTab);
   const grid = $('#shop-grid');
   grid.innerHTML = '';
-  const skin = ensureSelected(getSkins());
-  const sel = ensureHead(getHeads());
-  for (const head of getHeads().filter((h) => !h.hidden)) {
-    const wear = () => { progress.selectedHead = head.id; saveProgress(); renderShop(); };
-    grid.append(shopCard({
-      name: head.name, price: head.price, owned: isHeadUnlocked(head), selected: head.id === sel.id,
-      draw: (g, w, h) => drawSnakePreview(g, skin, w, h, 0.6, { head: head.id, portrait: true }),
-      onWear: wear,
-      onBuy: () => { progress.unlockedHeads.push(head.id); wear(); updateCoins(); },
-    }));
+  const head = playerHead();
+  const skin = playerSkin();
+  const add = (o) => grid.append(shopCard(o));
+
+  if (shopTab === 'bodies') {
+    // Snake Maker first
+    const makerOpen = progress.level >= MAKER_LEVEL;
+    const mk = document.createElement('button');
+    mk.className = 'skin-card maker-tile' + (makerOpen ? '' : ' locked level-lock');
+    mk.innerHTML = `<div class="maker-tile-ico">🎨</div><div class="skin-name">Snake Maker</div><div class="skin-status">${makerOpen ? (progress.customMade ? 'Edit my snake' : 'Design your own!') : `🔒 Level ${MAKER_LEVEL}`}</div>`;
+    mk.addEventListener('click', () => {
+      if (!makerOpen) { sfx.error(); shake(mk); return; }
+      tap();
+      openMaker();
+    });
+    grid.append(mk);
+    const list = getSkins().filter((s) => !s.hidden);
+    if (progress.customMade) list.unshift(customSkin());
+    const sel = ensureSelected(getSkins());
+    for (const s of list) {
+      add({
+        name: s.name, price: s.price, state: isUnlocked(s) ? 'owned' : 'buy', selected: s.id === sel.id,
+        draw: (g, w, h) => drawSnakePreview(g, s, w, h, 0.6, { segments: 12, head }),
+        onWear: () => { progress.selected = s.id; saveProgress(); renderShop(); },
+        onBuy: () => { progress.unlocked.push(s.id); progress.selected = s.id; renderShop(); },
+      });
+    }
+  } else if (shopTab === 'heads') {
+    const sel = playerHead();
+    for (const h of getHeads().filter((x) => !x.hidden)) {
+      add({
+        name: h.name, price: h.price, state: isHeadUnlocked(h) ? 'owned' : 'buy', selected: h.id === sel, cls: 'head-card',
+        draw: (g, w, hh) => drawSnakePreview(g, skin, w, hh, 0.6, { head: h.id, portrait: true }),
+        onWear: () => { progress.selectedHead = h.id; saveProgress(); renderShop(); },
+        onBuy: () => { progress.unlockedHeads.push(h.id); progress.selectedHead = h.id; renderShop(); },
+      });
+    }
+  } else {
+    const kind = { hats: 'hat', trails: 'trail', arenas: 'theme' }[shopTab];
+    const items = { hat: HAT_ITEMS, trail: TRAIL_ITEMS, theme: THEME_ITEMS }[kind];
+    const sel = selectedItem(kind, items).id;
+    const base = ensureSelected(getSkins());
+    for (const it of items) {
+      const draw = kind === 'hat'
+        ? (g, w, h) => drawSnakePreview(g, base, w, h, 0.6, { head, portrait: true, hat: it.id === 'auto' ? base.hat : it.id })
+        : kind === 'trail'
+          ? (g, w, h) => drawTrailPreview(g, it.id, w, h)
+          : (g, w, h) => drawThemePreview(g, it.id, w, h);
+      add({
+        name: it.name, price: it.price, level: it.level, state: itemState(kind, it), selected: it.id === sel, cls: kind + '-card',
+        draw,
+        onWear: () => { selectItem(kind, it.id); renderShop(); },
+        onBuy: () => { ownItem(kind, it.id); selectItem(kind, it.id); renderShop(); },
+      });
+    }
   }
   updateCoins();
 }
 
-function shake(el) {
-  el.classList.remove('shake');
-  void el.offsetWidth;
-  el.classList.add('shake');
+// -------------------------------------------------------- snake maker ----
+const PALETTE = [
+  '#ff4f6d', '#ff7eb6', '#ff9ff3', '#b388ff', '#7b2ff7', '#3a0ca3', '#4cc9f0', '#1e90ff',
+  '#00e5ff', '#00f5d4', '#3ddc97', '#5be37d', '#2fbf5b', '#c6ff00', '#ffe14d', '#ffd60a',
+  '#ff9f1c', '#ff7b00', '#e8122a', '#8a5532', '#ffffff', '#c7d4ff', '#9aa5b1', '#2b2b2b',
+];
+const MAKER_PATTERNS = ['stripes', 'solid', 'gradient', 'cycle', 'spots', 'rainbow'];
+let draft = null;
+let draftSlot = 0;
+
+function makerSkin() {
+  return draft ? { id: 'draft', name: 'Draft', colors: draft.colors, pattern: draft.pattern, stripe: 2, eyes: draft.eyes, hat: 'none', price: 0 } : customSkin();
+}
+
+function openMaker() {
+  draft = JSON.parse(JSON.stringify(progress.custom));
+  draftSlot = 0;
+  renderMaker();
+  show('maker');
+}
+
+function renderMaker() {
+  const slots = $('#maker-slots');
+  slots.innerHTML = draft.colors.map((c, i) => `<button class="slot ${i === draftSlot ? 'on' : ''}" data-i="${i}" style="background:${c}" aria-label="Colour ${i + 1}"></button>`).join('') +
+    (draft.colors.length < 3 ? '<button class="slot add" data-add="1" aria-label="Add a colour">+</button>' : '') +
+    (draft.colors.length > 1 ? '<button class="slot rm" data-rm="1" aria-label="Remove a colour">−</button>' : '');
+  slots.querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => { draftSlot = +b.dataset.i; tap(); renderMaker(); }));
+  slots.querySelector('[data-add]')?.addEventListener('click', () => { draft.colors.push(pick(PALETTE)); draftSlot = draft.colors.length - 1; tap(); renderMaker(); });
+  slots.querySelector('[data-rm]')?.addEventListener('click', () => { draft.colors.splice(draftSlot, 1); draftSlot = Math.max(0, draftSlot - 1); tap(); renderMaker(); });
+  const pal = $('#maker-palette');
+  if (!pal.children.length) {
+    pal.innerHTML = PALETTE.map((c) => `<button class="swatch" data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join('');
+    pal.querySelectorAll('.swatch').forEach((b) => b.addEventListener('click', () => { draft.colors[draftSlot] = b.dataset.c; tap(); renderMaker(); }));
+  }
+  $('#maker-patterns').innerHTML = MAKER_PATTERNS.map((p) => `<button class="chip ${draft.pattern === p ? 'on' : ''}" data-p="${p}">${esc(PATTERNS[p].split(' (')[0])}</button>`).join('');
+  $('#maker-patterns').querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => { draft.pattern = b.dataset.p; tap(); renderMaker(); }));
+  $('#maker-eyes').innerHTML = Object.entries(EYES).map(([k, v]) => `<button class="chip ${draft.eyes === k ? 'on' : ''}" data-e="${k}">${esc(v)}</button>`).join('');
+  $('#maker-eyes').querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => { draft.eyes = b.dataset.e; tap(); renderMaker(); }));
+}
+
+function saveMaker() {
+  progress.custom = draft;
+  progress.customMade = true;
+  progress.selected = 'custom';
+  saveProgress();
+  draft = null;
+  sfx.win();
+  confetti(80);
+  openShop('bodies');
+}
+
+// ---------------------------------------------------------- adventure ----
+function openAdventure() {
+  tap();
+  renderAdventure();
+  show('adventure');
+}
+
+function renderAdventure() {
+  $('#adv-stars').textContent = `${totalAdventureStars()}/${LEVELS.length * 3}`;
+  const map = $('#adv-map');
+  map.innerHTML = '';
+  WORLDS.forEach((w, wi) => {
+    const levels = LEVELS.filter((l) => l.worldIndex === wi);
+    const got = levels.reduce((a, l) => a + levelStars(l.index), 0);
+    const sec = document.createElement('section');
+    sec.className = `world world-${w.id}`;
+    sec.innerHTML = `<header><span class="w-ico">${w.icon}</span><b>World ${wi + 1}: ${esc(w.name)}</b><span class="w-stars">⭐ ${got}/${levels.length * 3}</span></header><div class="level-grid"></div>`;
+    const grid = sec.querySelector('.level-grid');
+    for (const lv of levels) {
+      const open = isLevelOpen(lv.index);
+      const st = levelStars(lv.index);
+      const b = document.createElement('button');
+      b.className = 'level-node' + (open ? '' : ' locked') + (lv.boss ? ' boss' : '') + (st ? ' done' : '');
+      b.innerHTML = `<span class="ln-num">${lv.boss ? '💀' : levelLabel(lv)}</span><span class="ln-goal">${open ? goalIcon(lv) : '🔒'}</span><span class="ln-stars">${[0, 1, 2].map((i) => `<i class="${i < st ? 'on' : ''}">★</i>`).join('')}</span>`;
+      b.addEventListener('click', () => {
+        if (!open) { sfx.error(); haptic(30); shake(b); return; }
+        currentLevel = lv;
+        openReady();
+      });
+      grid.append(b);
+    }
+    map.append(sec);
+  });
+  // scroll to the newest open level
+  requestAnimationFrame(() => {
+    const nodes = [...map.querySelectorAll('.level-node:not(.locked)')];
+    nodes[nodes.length - 1]?.scrollIntoView({ block: 'center' });
+  });
+}
+
+// --------------------------------------------------- missions/trophies ----
+function openMissions() {
+  tap();
+  renderMissions();
+  show('missions');
+}
+
+function renderMissions() {
+  const list = dailyMissions();
+  const now = new Date(), mid = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const mins = Math.max(1, Math.round((mid - now) / 60000));
+  $('#missions-reset').textContent = `New missions in ${Math.floor(mins / 60)}h ${mins % 60}m`;
+  const box = $('#missions-list');
+  box.innerHTML = list.map((m, i) => {
+    const d = missionDef(m), r = missionReward(m), done = m.progress >= m.target;
+    return `<div class="mission ${m.claimed ? 'claimed' : done ? 'ready' : ''}">
+      <span class="m-ico">${d.icon}</span>
+      <div class="m-body"><b>${esc(missionText(m))}</b>
+        <span class="m-bar"><i style="width:${(m.progress / m.target) * 100}%"></i></span>
+        <small>${m.progress} / ${m.target} · reward 🪙 ${r.coins} + ${r.xp} XP</small></div>
+      ${m.claimed ? '<span class="m-done">✅</span>' : `<button class="btn btn-small ${done ? 'btn-green' : 'btn-ghost'}" data-i="${i}" ${done ? '' : 'disabled'}>${done ? 'Claim' : '…'}</button>`}
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => {
+    const r = claimMission(+b.dataset.i);
+    if (!r) return;
+    sfx.coin(); sfx.win(); haptic([20, 30, 20]);
+    const rect = b.getBoundingClientRect();
+    confetti(50, rect.left + rect.width / 2, rect.top);
+    updateCoins();
+    renderMissions();
+  }));
+}
+
+function openTrophies() {
+  tap();
+  renderTrophies();
+  show('trophies');
+}
+
+function renderTrophies() {
+  const stats = [
+    ['🆙', 'Level', progress.level], ['🎮', 'Matches', progress.games], ['🐍', 'Best size', progress.best],
+    ['😋', 'Eaten', progress.kills], ['⭐', 'Stars', progress.totalStars], ['👑', 'Wins', progress.wins],
+  ];
+  $('#stats-strip').innerHTML = stats.map(([i, k, v]) => `<div><span>${i}</span><b>${v.toLocaleString()}</b><small>${k}</small></div>`).join('');
+  const box = $('#trophy-list');
+  box.innerHTML = TROPHIES.map((t) => {
+    const s = trophyState(t);
+    const canClaim = s.reached > s.claimed;
+    const target = t.tiers[Math.min(s.claimed, 2)];
+    const pct = s.claimed >= 3 ? 100 : Math.min(100, (s.value / target) * 100);
+    return `<div class="trophy ${canClaim ? 'ready' : ''}">
+      <span class="t-ico">${t.icon}</span>
+      <div class="t-body"><b>${esc(t.name)}</b>
+        <span class="t-medals">${MEDALS.map((m, i) => `<i class="${i < s.claimed ? 'on' : ''}">${m}</i>`).join('')}</span>
+        <span class="m-bar"><i style="width:${pct}%"></i></span>
+        <small>${esc(t.desc)}: ${s.value.toLocaleString()}${s.claimed >= 3 ? ' · all done!' : ` / ${target.toLocaleString()}`}</small></div>
+      ${canClaim ? `<button class="btn btn-small btn-green" data-id="${t.id}">🪙 ${TROPHY_REWARDS[s.claimed]}</button>` : ''}
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-id]').forEach((b) => b.addEventListener('click', () => {
+    const r = claimTrophy(b.dataset.id);
+    if (!r) return;
+    sfx.win(); haptic([20, 30, 20]);
+    const rect = b.getBoundingClientRect();
+    confetti(60, rect.left + rect.width / 2, rect.top);
+    updateCoins();
+    renderTrophies();
+  }));
 }
 
 // ---------------------------------------------------------- boosters ----
@@ -279,7 +465,21 @@ function openReady() {
   initAudio();
   tap();
   const S = getSettings();
-  if (!S.boostersEnabled) { startGame([]); return; }
+  $('#ready-title').textContent = currentLevel ? `Level ${levelLabel(currentLevel)}` : 'Boosters';
+  $('#ready-goal').classList.toggle('hidden', !currentLevel);
+  if (currentLevel) {
+    const st = levelStars(currentLevel.index);
+    $('#ready-goal').innerHTML = `<span class="rg-ico">${goalIcon(currentLevel)}</span><div><b>${esc(goalText(currentLevel))}</b><small>${currentLevel.world.icon} ${esc(currentLevel.world.name)} · ⏱ ${Math.round(currentLevel.world.seconds / 60 * 10) / 10} min · best ${'★'.repeat(st)}${'☆'.repeat(3 - st)}</small></div>`;
+  }
+  if (!S.boostersEnabled) {
+    $('#booster-grid').innerHTML = '';
+    $('#screen-ready .muted').classList.add('hidden');
+    picked = new Set();
+    renderBoosters();
+    show('ready');
+    return;
+  }
+  $('#screen-ready .muted').classList.remove('hidden');
   picked = new Set([...picked].filter((k) => S.boosterPrices[k] <= progress.coins && !(k === 'life' && S.gentle)));
   renderBoosters();
   show('ready');
@@ -291,37 +491,40 @@ function boosterCost() {
 }
 
 function renderBoosters() {
-  const P = getSettings().boosterPrices;
+  const S = getSettings();
+  const P = S.boosterPrices;
   const grid = $('#booster-grid');
-  // Extra Life is pointless when you can't be eaten anyway
-  const list = Object.entries(BOOSTERS).filter(([k]) => !(k === 'life' && getSettings().gentle));
-  grid.innerHTML = list.map(([k, b]) => `
-    <button class="booster ${picked.has(k) ? 'on' : ''}" data-k="${k}">
-      <span class="b-ico">${b.icon}</span>
-      <b>${b.name}</b>
-      <small>${b.desc}</small>
-      <span class="b-price">${P[k] ? '🪙 ' + P[k] : 'FREE'}</span>
-      <span class="b-check">✓</span>
-    </button>`).join('');
-  grid.querySelectorAll('.booster').forEach((el) => el.addEventListener('click', () => {
-    const k = el.dataset.k;
-    if (picked.has(k)) {
-      picked.delete(k);
-      tap();
-    } else if (boosterCost() + P[k] > progress.coins) {
-      sfx.error();
-      haptic(40);
-      shake(el);
-      el.querySelector('.b-price').textContent = 'Not enough!';
-      setTimeout(() => { el.querySelector('.b-price').textContent = P[k] ? '🪙 ' + P[k] : 'FREE'; }, 1300);
-      return;
-    } else {
-      picked.add(k);
-      sfx.power();
-      haptic(15);
-    }
-    renderBoosters();
-  }));
+  if (S.boostersEnabled) {
+    // Extra Life is pointless when you can't be eaten anyway
+    const list = Object.entries(BOOSTERS).filter(([k]) => !(k === 'life' && S.gentle));
+    grid.innerHTML = list.map(([k, b]) => `
+      <button class="booster ${picked.has(k) ? 'on' : ''}" data-k="${k}">
+        <span class="b-ico">${b.icon}</span>
+        <b>${b.name}</b>
+        <small>${b.desc}</small>
+        <span class="b-price">${P[k] ? '🪙 ' + P[k] : 'FREE'}</span>
+        <span class="b-check">✓</span>
+      </button>`).join('');
+    grid.querySelectorAll('.booster').forEach((el) => el.addEventListener('click', () => {
+      const k = el.dataset.k;
+      if (picked.has(k)) {
+        picked.delete(k);
+        tap();
+      } else if (boosterCost() + P[k] > progress.coins) {
+        sfx.error();
+        haptic(40);
+        shake(el);
+        el.querySelector('.b-price').textContent = 'Not enough!';
+        setTimeout(() => { el.querySelector('.b-price').textContent = P[k] ? '🪙 ' + P[k] : 'FREE'; }, 1300);
+        return;
+      } else {
+        picked.add(k);
+        sfx.power();
+        haptic(15);
+      }
+      renderBoosters();
+    }));
+  }
   const cost = boosterCost();
   $('#btn-go').innerHTML = cost ? `GO! <small>−🪙 ${cost}</small>` : 'GO!';
   for (const el of document.querySelectorAll('#screen-ready .coin-count')) el.textContent = (progress.coins - cost).toLocaleString();
@@ -334,25 +537,45 @@ function visibleHeads() {
 
 function startDemo() {
   input.enabled = false;
-  game.setup('demo', { settings: { ...getSettings(), arenaSize: 'small', showNames: true }, skins: getSkins(), heads: visibleHeads() });
+  currentLevel = null;
+  game.setup('demo', {
+    settings: { ...getSettings(), arenaSize: 'small', showNames: true }, skins: getSkins(), heads: visibleHeads(),
+    theme: selectedItem('theme', THEME_ITEMS).id,
+  });
+}
+
+/** Settings for this match: adventure levels set their own arena, bots and timer. */
+function matchSettings() {
+  const S = getSettings();
+  if (!currentLevel) return S;
+  const w = currentLevel.world;
+  // use whichever difficulty is easier: the level's or the grown-up setting
+  const diff = DIFF_ORDER[Math.min(DIFF_ORDER.indexOf(w.difficulty), DIFF_ORDER.indexOf(S.difficulty))];
+  return { ...S, botCount: w.bots, arenaSize: w.arena, matchSeconds: w.seconds, difficulty: diff };
 }
 
 async function startGame(boosters) {
   initAudio();
   const skins = getSkins();
-  const settings = getSettings();
-  const skin = ensureSelected(skins);
+  const settings = matchSettings();
   const P = settings.boosterPrices;
-  const list = boosters.filter((k) => BOOSTERS[k]);
+  const list = settings.boostersEnabled ? boosters.filter((k) => BOOSTERS[k]) : [];
   const cost = list.reduce((a, k) => a + P[k], 0);
   if (cost > progress.coins) return;
   progress.coins -= cost;
   saveProgress();
-  game.setup('play', { settings, skins, skin, name: progress.name.trim() || 'You', boosters: list, head: ensureHead(getHeads()).id, heads: visibleHeads() });
+  game.setup('play', {
+    settings, skins, skin: playerSkin(), name: progress.name.trim() || 'You', boosters: list,
+    head: playerHead(), heads: visibleHeads(),
+    theme: currentLevel ? currentLevel.world.theme : selectedItem('theme', THEME_ITEMS).id,
+    trail: selectedItem('trail', TRAIL_ITEMS).id,
+    level: currentLevel,
+  });
   input.reset();
   input.enabled = true;
   $('#btn-boost').classList.toggle('hidden', !settings.boostEnabled);
   $('#hud-timer').classList.toggle('hidden', settings.matchSeconds <= 0);
+  $('#hud-goal').classList.toggle('hidden', !currentLevel);
   $('#toasts').innerHTML = '';
   applyPrefs();
   show('play');
@@ -416,6 +639,8 @@ function pauseGame() {
   game.paused = true;
   input.reset();
   tap();
+  $('#pause-goal').classList.toggle('hidden', !currentLevel);
+  if (currentLevel) $('#pause-goal').textContent = `🎯 ${goalText(currentLevel)}`;
   show('pause');
 }
 
@@ -448,15 +673,28 @@ function onHud(d) {
     $('#hud-timer').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
     $('#hud-timer').classList.toggle('urgent', s <= 10);
   }
-  $('#hud-board').innerHTML = d.top
-    .map((s, i) => `<li class="${s.me ? 'me' : ''}"><span class="dot" style="background:${s.color}"></span><span class="n">${i === 0 ? '👑' : i + 1 + '.'} ${esc(s.name)}</span><b>${s.length}</b></li>`)
-    .join('') + (d.top.some((s) => s.me) || d.rank > d.total ? '' : `<li class="me"><span class="dot"></span><span class="n">${d.rank}. You</span><b>${d.length}</b></li>`);
+  if (progress.extendedUi) {
+    $('#hud-board').innerHTML = d.top
+      .map((s, i) => `<li class="${s.me ? 'me' : ''}"><span class="dot" style="background:${s.color}"></span><span class="n">${i === 0 ? '👑' : i + 1 + '.'} ${esc(s.name)}</span><b>${s.length}</b></li>`)
+      .join('') + (d.top.some((s) => s.me) || d.rank > d.total ? '' : `<li class="me"><span class="dot"></span><span class="n">${d.rank}. You</span><b>${d.length}</b></li>`);
+  }
   const pw = d.powers.filter((p) => POWER_ICONS[p.type]).map((p) => {
     const [icon, color] = POWER_ICONS[p.type];
     return `<span class="pw" style="--c:${color}">${icon}<small>${Math.ceil(p.left)}</small></span>`;
   });
   if (d.ghost > 0 && d.ghost < 100) pw.unshift(`<span class="pw" style="--c:#8ecbff">🫧<small>${Math.ceil(d.ghost)}</small></span>`);
   $('#hud-powers').innerHTML = pw.join('');
+  if (d.goal && currentLevel) {
+    const G = d.goal;
+    let text, frac;
+    if (G.type === 'top') { text = G.value ? "You're #1 — stay there!" : 'Become the biggest snake'; frac = G.value ? 1 : 0; }
+    else if (G.type === 'boss') { text = G.done ? 'Boss beaten!' : `Beat ${currentLevel.boss.name} (size ${G.bossSize})`; frac = G.done ? 1 : Math.min(0.95, d.length / Math.max(1, G.bossSize)); }
+    else { text = `${goalText(currentLevel)}: ${Math.min(G.value, G.target)} / ${G.target}`; frac = G.value / G.target; }
+    $('#hud-goal .g-ico').textContent = goalIcon(currentLevel);
+    $('#hud-goal .g-text').textContent = text;
+    $('#hud-goal .g-bar i').style.width = Math.min(100, frac * 100) + '%';
+    $('#hud-goal').classList.toggle('done', !!G.done || (G.type === 'top' && !!G.value));
+  }
 }
 
 function toast(msg, ms = 2200) {
@@ -471,35 +709,64 @@ function toast(msg, ms = 2200) {
   setTimeout(() => el.remove(), ms);
 }
 
+// ------------------------------------------------------------ results ----
 function onEnd(r) {
   input.enabled = false;
   input.reset();
   try { wakeLock?.release(); } catch { /* ignore */ }
   wakeLock = null;
   const S = getSettings();
-  const rankBonus = r.reason === 'time' ? ([50, 30, 20][r.rank - 1] ?? 5) : 0;
+  const lv = r.level;
+  const won = r.reason === 'time' && r.rank === 1;
+
+  // coins
   const parts = [
     ['Size', Math.floor(r.maxLength / 4)],
     ['Snakes eaten', r.kills * 8],
   ];
   if (r.bestStreak >= 2) parts.push([`Best combo ×${r.bestStreak}`, r.bestStreak * 5]);
-  if (rankBonus) parts.push([`Finished #${r.rank}`, rankBonus]);
+  if (!lv && r.reason === 'time') parts.push([`Finished #${r.rank}`, [50, 30, 20][r.rank - 1] ?? 5]);
+
+  let stars = 0, newStars = 0, prevStars = 0;
+  if (lv) {
+    stars = starsFor(lv, r);
+    prevStars = levelStars(lv.index);
+    newStars = Math.max(0, stars - prevStars);
+    if (stars > prevStars) progress.adv[lv.index] = stars;
+    if (stars && !prevStars) parts.push(['First clear!', 25 + lv.worldIndex * 15 + (lv.boss ? 50 : 0)]);
+    if (newStars) parts.push([`New stars ×${newStars}`, newStars * 15]);
+  }
   let coins = parts.reduce((a, [, v]) => a + v, 0) * S.coinMultiplier;
   if (r.coinRush) coins *= 2;
   coins = Math.round(coins);
+
+  // lifetime stats
   const newBest = r.maxLength > progress.best;
   progress.coins += coins;
   progress.games++;
   progress.kills += r.kills;
+  progress.totalStars += r.starsEaten || 0;
+  progress.totalPowerups += r.powerups || 0;
+  if (won) progress.wins++;
   progress.bestStreak = Math.max(progress.bestStreak || 0, r.bestStreak);
   if (newBest) progress.best = r.maxLength;
   saveProgress();
 
-  let title, sub, stars;
-  if (r.reason === 'eaten') {
+  // missions + XP
+  const levelBefore = progress.level;
+  recordMissionStats({ kills: r.kills, maxSize: r.maxLength, stars: r.starsEaten || 0, games: 1, powerups: r.powerups || 0, streak: r.bestStreak, wins: won ? 1 : 0, advStars: newStars });
+  const xp = matchXp(r, newStars) + (lv && stars ? 30 : 0);
+  const levels = addXp(xp);
+
+  // headline
+  let title, sub;
+  if (lv) {
+    title = stars ? (lv.boss ? '💀 Boss beaten!' : 'Level complete!') : 'So close!';
+    sub = stars ? esc(goalText(lv)) : `${esc(goalText(lv))} — try again!`;
+  } else if (r.reason === 'eaten') {
     title = r.killer ? 'Chomped!' : 'Oh no!';
     sub = r.killer ? `${esc(r.killer)} was bigger this time` : 'Better luck next time';
-    stars = r.maxLength >= 100 || r.kills >= 3 ? 2 : r.maxLength >= 30 || r.kills > 0 ? 1 : 0;
+    stars = Math.max(1, r.maxLength >= 100 || r.kills >= 3 ? 2 : 1);
   } else if (r.reason === 'time') {
     title = r.rank === 1 ? '👑 You WON! 👑' : r.rank <= 3 ? `#${r.rank} — Awesome!` : "Time's up!";
     sub = r.rank === 1 ? 'Biggest snake in the arena!' : `You finished #${r.rank} of ${r.total}`;
@@ -507,26 +774,59 @@ function onEnd(r) {
   } else {
     title = 'Game over';
     sub = 'See you next time!';
-    stars = r.maxLength >= 30 ? 1 : 0;
+    stars = 1;
   }
-  stars = Math.max(1, stars); // everyone gets at least one star
   $('#over-title').innerHTML = title;
   $('#over-sub').innerHTML = sub;
   $('#over-stats').innerHTML = `
     <div><b>${r.maxLength}</b><span>biggest</span></div>
     <div><b>${r.kills}</b><span>eaten</span></div>
-    <div><b>#${r.rank}</b><span>rank</span></div>`;
+    <div><b>${lv ? (r.starsEaten || 0) : '#' + r.rank}</b><span>${lv ? 'stars grabbed' : 'rank'}</span></div>`;
   $('#over-breakdown').innerHTML = parts.map(([k, v]) => `<li><span>${k}</span><b>+${v}</b></li>`).join('') +
     (S.coinMultiplier !== 1 ? `<li><span>Bonus</span><b>×${S.coinMultiplier}</b></li>` : '') +
     (r.coinRush ? '<li><span>💰 Coin Rush</span><b>×2</b></li>' : '');
   $('#over-best').classList.toggle('hidden', !newBest);
+
+  // XP bar + level up
+  $('#over-xp').textContent = `+${xp} XP`;
+  $('#over-level').textContent = levels.length ? levelBefore : progress.level;
+  const bar = $('#over-xp-bar');
+  bar.style.transition = 'none';
+  bar.style.width = levels.length ? '0%' : Math.max(0, ((progress.xp - xp) / xpForLevel(progress.level)) * 100) + '%';
+  setTimeout(() => {
+    bar.style.transition = '';
+    bar.style.width = (levels.length ? 100 : (progress.xp / xpForLevel(progress.level)) * 100) + '%';
+  }, 400);
+  const lu = $('#over-levelup');
+  lu.classList.toggle('hidden', !levels.length);
+  if (levels.length) {
+    const top = levels[levels.length - 1];
+    const unlocks = levels.flatMap((l) => l.unlocks);
+    const bonus = levels.reduce((a, l) => a + l.coins, 0);
+    lu.innerHTML = `<b>🎉 LEVEL UP! You're level ${top.level}</b><span>+🪙 ${bonus}${unlocks.length ? ' · Unlocked: ' + unlocks.map(esc).join(', ') : ''}</span>`;
+    setTimeout(() => { $('#over-level').textContent = progress.level; bar.style.transition = 'none'; bar.style.width = (progress.xp / xpForLevel(progress.level)) * 100 + '%'; sfx.levelup(); confetti(120); }, 1400);
+  }
+
+  // today's missions
+  $('#over-missions').innerHTML = dailyMissions().map((m) => {
+    const done = m.progress >= m.target;
+    return `<span class="om ${done ? 'done' : ''}">${missionDef(m).icon} ${Math.min(m.progress, m.target)}/${m.target}${done ? ' ✅' : ''}</span>`;
+  }).join('');
+
+  // buttons
+  const next = lv && stars ? LEVELS[lv.index + 1] : null;
+  $('#btn-again').innerHTML = lv ? (next ? '▶ Next level' : stars ? '🔁 Play again' : '🔁 Try again') : '▶ Play again';
+  $('#btn-again').dataset.next = next ? String(next.index) : '';
+  $('#btn-over-map').classList.toggle('hidden', !lv);
+  $('#btn-over-skins').classList.toggle('hidden', !!lv);
+
   const starEls = [...document.querySelectorAll('#over-stars span')];
   starEls.forEach((el) => el.classList.remove('on'));
   show('over');
   starEls.forEach((el, i) => {
     if (i < stars) setTimeout(() => { el.classList.add('on'); sfx.coin(); haptic(15); }, 350 + i * 300);
   });
-  if (stars === 3 || newBest) setTimeout(() => confetti(140), 300);
+  if (stars === 3 || newBest || (lv && lv.boss && stars)) setTimeout(() => confetti(140), 300);
   // count-up animation
   const el = $('#over-coins');
   const t0 = performance.now() + 300, dur = Math.min(1500, 300 + coins * 15);
@@ -538,6 +838,12 @@ function onEnd(r) {
     if (f < 1 && state === 'over') requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
+}
+
+function playAgain() {
+  const next = $('#btn-again').dataset.next;
+  if (next) currentLevel = LEVELS[+next];
+  openReady();
 }
 
 // --------------------------------------------------------- confetti ----
@@ -586,7 +892,7 @@ async function boot() {
   ensureSelected(getSkins());
   setSound(progress.sound);
   setMusic(progress.music);
-  game = new Game($('#game'), { onHud, onEnd, toast, haptic });
+  game = new Game($('#game'), { onHud, onEnd, toast, haptic, goalText });
   input = new Input($('#game'));
   game.input = input;
   window.snek = { game }; // handy for debugging from the console
@@ -603,26 +909,37 @@ async function boot() {
   document.addEventListener('dblclick', (e) => e.preventDefault());
 
   const on = (id, fn) => $(id).addEventListener('click', fn);
-  on('#btn-play', openReady);
+  const home = () => { tap(); show('home'); };
+  on('#btn-play', () => { currentLevel = null; openReady(); });
+  on('#btn-adventure', openAdventure);
   on('#btn-go', () => startGame([...picked]));
-  on('#btn-ready-back', () => { tap(); show('home'); });
+  on('#btn-ready-back', () => { tap(); if (currentLevel) { renderAdventure(); show('adventure'); } else show('home'); });
+  on('#btn-adv-back', home);
   on('#btn-skins', () => { tap(); openShop(); });
+  on('#btn-missions', openMissions);
+  on('#btn-missions-close', home);
+  on('#btn-trophies', openTrophies);
+  on('#btn-level', openTrophies);
+  on('#btn-trophies-back', home);
   on('#btn-help', () => { tap(); show('help'); });
-  on('#btn-help-close', () => { tap(); show('home'); });
-  on('#btn-shop-back', () => { tap(); show('home'); });
+  on('#btn-help-close', home);
+  on('#btn-shop-back', home);
+  on('#btn-maker-cancel', () => { tap(); draft = null; openShop('bodies'); });
+  on('#btn-maker-save', saveMaker);
   for (const b of document.querySelectorAll('.shop-tab')) b.addEventListener('click', () => { tap(); shopTab = b.dataset.tab; renderShop(); $('#shop-grid').scrollTop = 0; });
   on('#btn-pause', pauseGame);
   on('#btn-resume', resumeGame);
   on('#btn-quit', () => { tap(); quitGame(); });
-  on('#btn-again', openReady);
+  on('#btn-again', playAgain);
   on('#btn-home', () => { tap(); startDemo(); show('home'); });
   on('#btn-over-skins', () => { tap(); startDemo(); openShop(); });
+  on('#btn-over-map', () => { tap(); startDemo(); renderAdventure(); show('adventure'); });
   on('#btn-settings', () => { tap(); openSettings('home'); });
   on('#btn-pause-settings', () => { tap(); openSettings('pause'); });
   on('#btn-settings-close', () => { tap(); show(settingsReturn); });
   on('#btn-gift', openGift);
   on('#gift-box', claimGift);
-  on('#btn-gift-close', () => { tap(); show('home'); });
+  on('#btn-gift-close', home);
   for (const b of document.querySelectorAll('.toggle')) {
     b.addEventListener('click', () => {
       initAudio();
@@ -678,3 +995,4 @@ async function boot() {
 }
 
 boot();
+

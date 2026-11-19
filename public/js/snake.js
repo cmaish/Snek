@@ -84,7 +84,7 @@ export class Snake {
   labelLift() { return this.headId ? 1.55 * headTop(this.headId) : 1.24 * (this.skin.hat !== 'none' ? 2.1 : 1); }
 
   grow(v) {
-    const g = v * (this.power.double > 0 ? 2 : 1);
+    const g = v * (this.power.double > 0 ? 2 : 1) * (this.isBoss ? 0.3 : 1); // bosses grow slowly
     this._mass += g;
     this.bodyLen = Math.min(220, this.bodyLen + g * 0.55);
     if (this.mass > this.maxMass) this.maxMass = this.mass;

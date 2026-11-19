@@ -31,6 +31,15 @@ export const HATS = {
   antenna: 'Antennae',
   halo: 'Halo',
   unicorn: 'Unicorn horn',
+  pirate: 'Pirate hat',
+  chef: 'Chef hat',
+  cowboy: 'Cowboy hat',
+  wizard: 'Wizard hat',
+  flower: 'Flower crown',
+  headphones: 'Headphones',
+  beanie: 'Beanie',
+  viking: 'Viking helmet',
+  santa: 'Santa hat',
 };
 
 export const DEFAULT_SKINS = [
